@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard — Disparos do Mestre</title>
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon">🚀</div>
+      <div>
+        <div class="logo-text">Disparos do Mestre</div>
+        <div class="logo-sub">Sistema de Disparos</div>
+      </div>
+    </div>
+    
+    <nav class="sidebar-nav">
+      <div class="nav-section-title">Menu Principal</div>
+      <a href="index.html" class="nav-link"><span class="nav-icon">📊</span> Dashboard</a>
+      <a href="campaigns.html" class="nav-link"><span class="nav-icon">📝</span> Campanhas</a>
+      <a href="channels.html" class="nav-link"><span class="nav-icon">📡</span> Canais</a>
+      <a href="history.html" class="nav-link"><span class="nav-icon">🕒</span> Histórico</a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="bot-status" onclick="openModal('bot-modal')" style="cursor: pointer;" data-tip="Configurar Bot">
+        <div class="bot-status-dot" id="bot-dot"></div>
+        <div class="bot-status-info">
+          <div class="bot-status-name" id="bot-name">Sem Bot Configurado</div>
+          <div class="bot-status-label">Clique para configurar</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="main-wrapper">
+    <header class="topbar">
+      <div class="flex-center">
+        <button class="menu-toggle" onclick="toggleMenu()">☰</button>
+        <div>
+          <h1 class="topbar-title">Dashboard</h1>
+          <div class="topbar-subtitle">Visão geral do sistema e próximos disparos</div>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <a href="campaigns.html" class="btn btn-primary">➕ Nova Campanha</a>
+      </div>
+    </header>
+
+    <div class="page-content">
+      <!-- Stats Grid -->
+      <div class="stats-grid">
+        <div class="stat-card accent">
+          <span class="stat-icon">📡</span>
+          <div class="stat-value" id="stat-channels">0</div>
+          <div class="stat-label">Canais Ativos</div>
+        </div>
+        <div class="stat-card success">
+          <span class="stat-icon">✅</span>
+          <div class="stat-value" id="stat-sent">0</div>
+          <div class="stat-label">Mensagens Enviadas</div>
+        </div>
+        <div class="stat-card warning">
+          <span class="stat-icon">⏰</span>
+          <div class="stat-value" id="stat-pending">0</div>
+          <div class="stat-label">Disparos Pendentes</div>
+        </div>
+        <div class="stat-card danger">
+          <span class="stat-icon">❌</span>
+          <div class="stat-value" id="stat-failed">0</div>
+          <div class="stat-label">Falhas de Envio</div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <!-- Upcoming Jobs -->
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">Próximos Disparos</h2>
+            <a href="campaigns.html" class="btn btn-ghost btn-sm">Ver todas</a>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Campanha</th>
+                  <th>Tipo</th>
+                  <th>Próxima Execução</th>
+                </tr>
+              </thead>
+              <tbody id="upcoming-tbody">
+                <tr><td colspan="3" class="empty-state-desc">Carregando...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Recent Logs -->
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">Últimos Envios</h2>
+            <a href="history.html" class="btn btn-ghost btn-sm">Histórico Completo</a>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Canal</th>
+                  <th>Status</th>
+                  <th>Data</th>
+                </tr>
+              </thead>
+              <tbody id="recent-tbody">
+                <tr><td colspan="3" class="empty-state-desc">Carregando...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Bot Token Modal -->
+  <div class="modal-overlay" id="bot-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 class="modal-title">Configuração do Bot Telegram</h2>
+        <button class="btn-icon" onclick="closeModal('bot-modal')">✖</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Token do Bot (BotFather)</label>
+          <input type="password" id="bot-token-input" class="form-control" placeholder="123456789:ABCDEF...">
+          <div class="form-hint">
+            Abra o <a href="https://t.me/BotFather" target="_blank" style="color:var(--accent)">@BotFather</a> no Telegram, crie um bot e cole o token aqui.
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('bot-modal')">Cancelar</button>
+        <button class="btn btn-primary" onclick="saveToken()">Salvar e Conectar</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast-container"></div>
+  <script src="assets/app.js"></script>
+  <script>
+    async function loadDashboard() {
+      try {
+        const data = await apiFetch('/stats/overview');
+        
+        // Update stats
+        document.getElementById('stat-channels').textContent = data.activeChannels;
+        document.getElementById('stat-sent').textContent = data.totalSent;
+        document.getElementById('stat-pending').textContent = data.pendingJobs;
+        document.getElementById('stat-failed').textContent = data.totalFailed;
+
+        // Upcoming
+        const ut = document.getElementById('upcoming-tbody');
+        if (data.upcomingJobs.length === 0) {
+          ut.innerHTML = '<tr><td colspan="3" class="empty-state-desc" style="text-align:center;padding:20px;">Nenhum disparo agendado.</td></tr>';
+        } else {
+          ut.innerHTML = data.upcomingJobs.map(j => `
+            <tr>
+              <td><strong>${escapeHtml(j.campaign_name)}</strong></td>
+              <td>${j.schedule_type === 'once' ? 'Único' : 'Recorrente'}</td>
+              <td>${fmtDate(j.run_at)}</td>
+            </tr>
+          `).join('');
+        }
+
+        // Recent
+        const rt = document.getElementById('recent-tbody');
+        if (data.recentLog.length === 0) {
+          rt.innerHTML = '<tr><td colspan="3" class="empty-state-desc" style="text-align:center;padding:20px;">Nenhum envio recente.</td></tr>';
+        } else {
+          rt.innerHTML = data.recentLog.slice(0,5).map(l => `
+            <tr>
+              <td><strong>${escapeHtml(l.campaign_name)}</strong></td>
+              <td>${escapeHtml(l.channel_name)}</td>
+              <td>${l.status === 'success' ? '<span style="color:var(--success)">Sucesso</span>' : (l.status === 'deleted' ? '<span style="color:var(--text-muted)">Apagado</span>' : '<span style="color:var(--danger)">Falha</span>')}</td>
+            </tr>
+          `).join('');
+        }
+      } catch (e) {
+        toast('Erro ao carregar dashboard', 'error');
+      }
+    }
+
+    async function saveToken() {
+      const token = document.getElementById('bot-token-input').value;
+      if (!token) return toast('Insira o token', 'warning');
+      try {
+        await apiPost('/stats/settings/token', { token });
+        toast('Bot conectado com sucesso!');
+        closeModal('bot-modal');
+        loadBotStatus();
+      } catch (e) {
+        toast(e.message, 'error');
+      }
+    }
+
+    loadDashboard();
+  </script>
+</body>
+</html>

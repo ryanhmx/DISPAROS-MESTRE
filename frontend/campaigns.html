@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Campanhas — Disparos do Mestre</title>
+  <link rel="stylesheet" href="assets/style.css">
+  <style>
+    .editor-layout { display: grid; grid-template-columns: 2fr 1fr; gap: 24px; }
+    @media (max-width: 900px) { .editor-layout { grid-template-columns: 1fr; } }
+    .campaign-list { margin-top: 30px; }
+  </style>
+</head>
+<body>
+
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon">🚀</div>
+      <div>
+        <div class="logo-text">Disparos do Mestre</div>
+        <div class="logo-sub">Sistema de Disparos</div>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-title">Menu Principal</div>
+      <a href="index.html" class="nav-link"><span class="nav-icon">📊</span> Dashboard</a>
+      <a href="campaigns.html" class="nav-link active"><span class="nav-icon">📝</span> Campanhas</a>
+      <a href="channels.html" class="nav-link"><span class="nav-icon">📡</span> Canais</a>
+      <a href="history.html" class="nav-link"><span class="nav-icon">🕒</span> Histórico</a>
+    </nav>
+  </aside>
+
+  <main class="main-wrapper">
+    <header class="topbar">
+      <div class="flex-center">
+        <button class="menu-toggle" onclick="toggleMenu()">☰</button>
+        <div>
+          <h1 class="topbar-title">Campanhas</h1>
+          <div class="topbar-subtitle">Crie mensagens, adicione imagens, botões e agende disparos</div>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <button class="btn btn-secondary" onclick="showList()">Ver Lista</button>
+        <button class="btn btn-primary" onclick="showEditor()">➕ Nova Campanha</button>
+      </div>
+    </header>
+
+    <div class="page-content">
+      
+      <!-- List View -->
+      <div id="view-list" class="card campaign-list">
+        <div class="flex-between mb-4" style="gap: 12px; justify-content: flex-end;">
+          <select id="filter-status" class="form-control" style="width:180px;" onchange="renderCampaigns()">
+            <option value="">Todos os Status</option>
+            <option value="draft">Rascunho</option>
+            <option value="scheduled">Agendado</option>
+            <option value="sent">Enviado</option>
+            <option value="failed">Falha</option>
+            <option value="deleted">Apagado</option>
+          </select>
+          <input type="text" id="search-campaign" class="form-control" placeholder="🔍 Pesquisar campanha..." oninput="renderCampaigns()" style="width:250px;">
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Nome</th>
+                <th>Status</th>
+                <th>Criada em</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody id="campaigns-tbody">
+              <tr><td colspan="4" class="empty-state-desc">Carregando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Editor View -->
+      <div id="view-editor" style="display: none;">
+        <div class="editor-layout">
+          <!-- Left: Builder -->
+          <div class="card">
+            <h2 class="card-title mb-4" id="editor-title">Nova Campanha</h2>
+            <input type="hidden" id="c-id">
+            
+            <div class="form-group">
+              <label class="form-label">Nome da Campanha (Interno)</label>
+              <input type="text" id="c-name" class="form-control" placeholder="Ex: Promoção Black Friday">
+            </div>
+
+
+            <div class="form-group">
+              <label class="form-label">Texto da Mensagem</label>
+              <div style="display:flex; flex-wrap:wrap; gap:4px; margin-bottom:8px; padding:6px 8px; background:var(--bg-input); border:1px solid var(--border); border-radius:var(--radius-sm) var(--radius-sm) 0 0; border-bottom:none;">
+                <button type="button" class="btn btn-ghost btn-sm" onclick="wrapTag('b')" title="Negrito" style="font-weight:bold; min-width:32px;">B</button>
+                <button type="button" class="btn btn-ghost btn-sm" onclick="wrapTag('i')" title="Itálico" style="font-style:italic; min-width:32px;">I</button>
+                <button type="button" class="btn btn-ghost btn-sm" onclick="wrapTag('u')" title="Sublinhado" style="text-decoration:underline; min-width:32px;">U</button>
+                <button type="button" class="btn btn-ghost btn-sm" onclick="wrapTag('s')" title="Riscado / Tachado" style="text-decoration:line-through; min-width:32px;">S</button>
+                <button type="button" class="btn btn-ghost btn-sm" onclick="wrapTag('code')" title="Monospace" style="font-family:monospace; min-width:32px;">&lt;/&gt;</button>
+                <button type="button" class="btn btn-ghost btn-sm" onclick="insertLink()" title="Link" style="min-width:32px;">🔗</button>
+                <button type="button" class="btn btn-ghost btn-sm" onclick="wrapTag('blockquote')" title="Citação / Bloco de Citação" style="min-width:32px;">❝</button>
+                <button type="button" class="btn btn-ghost btn-sm" onclick="wrapTag('tg-spoiler')" title="Spoiler" style="min-width:32px;">👁️</button>
+              </div>
+              <textarea id="c-text" class="form-control" style="border-radius: 0 0 var(--radius-sm) var(--radius-sm);" placeholder="Digite a mensagem aqui..." oninput="updateCharCount()"></textarea>
+              <div id="char-counter" style="text-align: right; font-size: 0.8rem; margin-top: 4px; color: var(--text-muted);">0 / 4096 caracteres</div>
+              <div class="form-hint" style="margin-top:6px;">
+                Use os botões acima para formatar. <b>B</b> = negrito, <i>I</i> = itálico, <u>U</u> = sublinhado, <s>S</s> = riscado, ❝ = citação em bloco.
+                <br>Emojis normais (Unicode) funcionam ✅. Emojis animados do Telegram Premium podem não ser reproduzidos pelo bot.
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Imagem Anexa (Opcional)</label>
+              <input type="file" id="c-image" accept="image/*" style="display:none" onchange="previewImage(this)">
+              <div class="upload-zone" id="upload-zone" onclick="document.getElementById('c-image').click()">
+                <div class="upload-zone-icon">🖼️</div>
+                <div class="upload-zone-text">Clique para selecionar uma imagem</div>
+                <div class="upload-zone-hint">JPG ou PNG (Max 5MB)</div>
+              </div>
+              <div id="image-preview-container" class="upload-preview" style="display:none">
+                <img id="image-preview" src="">
+                <div class="remove-img" onclick="removeImage()">✖</div>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Botões (Inline Keyboard)</label>
+              <div class="btn-builder" id="btn-builder"></div>
+              <button class="btn btn-ghost btn-sm mt-4" onclick="addBtnRow()">+ Adicionar Botão</button>
+            </div>
+
+            <div class="divider"></div>
+            <div class="flex" style="gap: 10px; justify-content: flex-end">
+                <button type="button" class="btn btn-secondary" onclick="showList()">Cancelar</button>
+                <button type="button" class="btn btn-secondary" onclick="testDriveCampaign()" style="background:var(--accent-glow); color:var(--accent); border-color:var(--accent);">🧪 Testar Envio</button>
+                <button type="button" class="btn btn-primary" onclick="saveCampaign()">💾 Salvar Campanha</button>
+              </div>
+          </div>
+
+          <!-- Right: Sidebar (Channels & Schedule) -->
+          <div>
+            <div class="card mb-4">
+              <div class="flex-between mb-4">
+                <h2 class="card-title" style="margin-bottom:0">Canais de Destino</h2>
+                <button class="btn btn-ghost btn-sm" id="btn-select-all" onclick="toggleSelectAllChannels()">Selecionar Todos</button>
+              </div>
+              <div class="channel-selector" id="c-channels">
+                <!-- Channels rendered here -->
+              </div>
+            </div>
+
+            <div class="card" id="schedule-card" style="display:none">
+              <h2 class="card-title mb-4">Disparar Campanha</h2>
+              <div class="tabs">
+                <button class="tab-btn active" onclick="setSchedTab('immediate')">Agora</button>
+                <button class="tab-btn" onclick="setSchedTab('once')">Agendar</button>
+                <button class="tab-btn" onclick="setSchedTab('recurring')">Recorrente</button>
+              </div>
+
+              <div id="sched-immediate">
+                <p class="form-hint mb-4">A campanha entrará na fila imediatamente.</p>
+              </div>
+
+              <div id="sched-once" style="display:none">
+                <div class="form-group">
+                  <label class="form-label">Data e Hora</label>
+                  <input type="datetime-local" id="sched-datetime" class="form-control">
+                </div>
+              </div>
+
+              <div id="sched-recurring" style="display:none">
+                <div class="form-group">
+                  <label class="form-label">Expressão Cron</label>
+                  <input type="text" id="sched-cron" class="form-control" placeholder="0 9 * * *">
+                  <div class="form-hint">Ex: <code>0 9 * * *</code> (Todo dia às 09:00).</div>
+                </div>
+              </div>
+
+              <button class="btn btn-success w-full mt-4" style="justify-content:center" onclick="dispatchCampaign()">🚀 Disparar</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- Quick Dispatch / Preview Modal -->
+  <div class="modal-overlay" id="preview-modal">
+    <div class="modal" style="max-width:500px">
+      <div class="modal-header">
+        <h2 class="modal-title">Prévia da Mensagem</h2>
+        <button class="btn-icon" onclick="closeModal('preview-modal')">✖</button>
+      </div>
+      <div class="modal-body">
+        <div class="tg-preview">
+          <div class="tg-bubble" id="tg-preview-bubble">
+            <!-- Rendered via JS -->
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Canais de Destino vinculados:</label>
+          <div id="preview-channels-list" style="font-size:0.85rem; color:var(--text-secondary); max-height:100px; overflow-y:auto; background:var(--bg-input); padding:8px; border-radius:var(--radius-sm);">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer" style="justify-content:space-between">
+        <button class="btn btn-secondary" onclick="closeModal('preview-modal')">Cancelar</button>
+        <button class="btn btn-success" id="btn-quick-dispatch">🚀 Disparar Imediatamente</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast-container"></div>
+  <script src="assets/app.js"></script>
+  <script>
+    let campaigns = [];
+    let channels = [];
+    let schedType = 'immediate';
+    let currentImgRemoved = false;
+
+    async function loadData() {
+      try {
+        [campaigns, channels] = await Promise.all([
+          apiFetch('/campaigns'),
+          apiFetch('/channels')
+        ]);
+        renderCampaigns();
+        renderChannels();
+      } catch (e) { toast('Erro ao carregar dados', 'error'); }
+    }
+
+    function renderCampaigns() {
+      const tb = document.getElementById('campaigns-tbody');
+      
+      const searchTerm = (document.getElementById('search-campaign')?.value || '').toLowerCase();
+      const statusFilter = document.getElementById('filter-status')?.value || '';
+
+      const filtered = campaigns.filter(c => {
+        const matchName = c.name.toLowerCase().includes(searchTerm);
+        const matchStatus = statusFilter === '' || c.status === statusFilter;
+        return matchName && matchStatus;
+      });
+
+      if (filtered.length === 0) {
+        tb.innerHTML = '<tr><td colspan="4" class="empty-state">Nenhuma campanha encontrada.</td></tr>';
+        return;
+      }
+      tb.innerHTML = filtered.map(c => `
+        <tr>
+          <td><strong>${escapeHtml(c.name)}</strong></td>
+          <td>${statusBadge(c.status)}</td>
+          <td>${fmtDate(c.created_at)}</td>
+          <td style="display: flex; gap: 8px; align-items: center;">
+            <button class="btn btn-sm btn-secondary" onclick="editCampaign('${c.id}')">✏️ Editar</button>
+            <button class="btn btn-sm btn-danger" onclick="deleteMessages('${c.id}')" title="Apagar mensagens enviadas do Telegram">🧹 Apagar</button>
+            <button class="btn btn-sm btn-danger" onclick="deleteCampaign('${c.id}')" title="Excluir Campanha">🗑️</button>
+            <div style="flex: 1;"></div>
+            <button class="btn btn-success" onclick="openPreviewModal('${c.id}')" title="Ver Prévia e Disparar" style="padding: 8px 20px; font-weight: bold;">🚀 Enviar Campanha</button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function renderChannels() {
+      const cont = document.getElementById('c-channels');
+      cont.innerHTML = channels.map(c => `
+        <div class="channel-item" onclick="this.classList.toggle('selected')" data-id="${c.id}">
+          <div class="channel-item-check">✔</div>
+          <div class="channel-item-info">
+            <div class="channel-item-name">${escapeHtml(c.name)}</div>
+            <div class="channel-item-id">${escapeHtml(c.username || c.chat_id)}</div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function showList() {
+      document.getElementById('view-list').style.display = 'block';
+      document.getElementById('view-editor').style.display = 'none';
+      loadData();
+    }
+
+    async function showEditor(id = null) {
+      document.getElementById('view-list').style.display = 'none';
+      document.getElementById('view-editor').style.display = 'block';
+      document.getElementById('btn-builder').innerHTML = '';
+      document.getElementById('schedule-card').style.display = id ? 'block' : 'none';
+      currentImgRemoved = false;
+
+      // Deselect all channels
+      document.querySelectorAll('.channel-item').forEach(el => el.classList.remove('selected'));
+
+      if (!id) {
+        document.getElementById('editor-title').textContent = 'Nova Campanha';
+        document.getElementById('c-id').value = '';
+        document.getElementById('c-name').value = '';
+        document.getElementById('c-text').value = '';
+        removeImage();
+      } else {
+        document.getElementById('editor-title').textContent = 'Editar Campanha';
+        try {
+          const c = await apiFetch(`/campaigns/${id}`);
+          document.getElementById('c-id').value = c.id;
+          document.getElementById('c-name').value = c.name;
+          document.getElementById('c-text').value = c.message_text;
+          
+          if (c.image_path) {
+            const filename = c.image_path.split(/[\\/]/).pop();
+            const url = `http://localhost:3131/uploads/${filename}`;
+            document.getElementById('image-preview').src = url;
+            document.getElementById('image-preview-container').style.display = 'inline-block';
+            document.getElementById('upload-zone').style.display = 'none';
+          } else {
+            removeImage();
+          }
+
+          if (c.buttons) {
+            try {
+              const btns = JSON.parse(c.buttons);
+              btns.forEach(row => {
+                if (Array.isArray(row) && row.length > 0) {
+                  const r = addBtnRow();
+                  const rowId = r.id;
+                  r.querySelector('.btn-builder-items').innerHTML = ''; // clear default
+                  row.forEach(b => addBtnToRow(rowId, escapeHtml(b.text), escapeHtml(b.url)));
+                }
+              });
+            } catch(e){}
+          }
+
+          if (c.channels) {
+            c.channels.forEach(ch => {
+              const el = document.querySelector(`.channel-item[data-id="${ch.id}"]`);
+              if (el) el.classList.add('selected');
+            });
+          }
+        } catch (e) { toast(e.message, 'error'); }
+      }
+      updateCharCount();
+    }
+
+    function editCampaign(id) { showEditor(id); }
+
+    function addBtnRow() {
+      const rowId = 'row-' + Date.now() + Math.random().toString(36).substr(2, 5);
+      const div = document.createElement('div');
+      div.className = 'btn-builder-row';
+      div.id = rowId;
+      div.innerHTML = `
+        <div class="btn-builder-items" style="flex:1; display:flex; flex-direction:column; gap:4px;"></div>
+        <div style="display:flex; flex-direction:column; gap:4px; margin-left:8px; align-items:center; justify-content:center;">
+          <button type="button" class="btn btn-sm btn-ghost" onclick="addBtnToRow('${rowId}')" title="Adicionar botão na mesma linha" style="color:var(--text-primary); font-size:1.2rem;">+</button>
+          <button type="button" class="btn-icon" style="color:var(--danger); font-size:1rem;" onclick="this.parentElement.parentElement.remove()" title="Remover linha toda">✖</button>
+        </div>
+      `;
+      document.getElementById('btn-builder').appendChild(div);
+      addBtnToRow(rowId);
+      return div;
+    }
+
+    function addBtnToRow(rowId, text = '', url = '') {
+      const row = document.getElementById(rowId);
+      if (!row) return;
+      const itemsContainer = row.querySelector('.btn-builder-items');
+      const div = document.createElement('div');
+      div.className = 'btn-builder-item';
+      div.style.display = 'flex';
+      div.style.gap = '8px';
+      div.style.alignItems = 'center';
+      div.innerHTML = `
+        <input type="text" placeholder="Texto" value="${text}" class="btn-text" style="flex:1; background:transparent; border:none; color:var(--text-primary); outline:none; font-size:0.85rem;">
+        <span class="divider" style="color:var(--border);">|</span>
+        <input type="text" placeholder="URL (https://...)" value="${url}" class="btn-url" style="flex:2; background:transparent; border:none; color:var(--text-primary); outline:none; font-size:0.85rem;">
+        <button type="button" class="btn-icon" style="color:var(--danger)" onclick="this.parentElement.remove()">✖</button>
+      `;
+      itemsContainer.appendChild(div);
+    }
+
+    // ── Formatting Toolbar ──────────────────────────────
+    function wrapTag(tag) {
+      const ta = document.getElementById('c-text');
+      const start = ta.selectionStart;
+      const end = ta.selectionEnd;
+      const text = ta.value;
+      const selected = text.substring(start, end);
+
+      const open = `<${tag}>`;
+      const close = `</${tag}>`;
+
+      if (selected) {
+        ta.value = text.substring(0, start) + open + selected + close + text.substring(end);
+        ta.selectionStart = start + open.length;
+        ta.selectionEnd = start + open.length + selected.length;
+      } else {
+        ta.value = text.substring(0, start) + open + close + text.substring(end);
+        ta.selectionStart = ta.selectionEnd = start + open.length;
+      }
+      ta.focus();
+    }
+
+    function insertLink() {
+      const ta = document.getElementById('c-text');
+      const start = ta.selectionStart;
+      const end = ta.selectionEnd;
+      const text = ta.value;
+      const selected = text.substring(start, end);
+
+      const url = prompt('Cole a URL do link:', 'https://');
+      if (!url) return;
+      const label = selected || prompt('Texto visível do link:', 'Clique aqui');
+      if (!label) return;
+
+      const link = `<a href="${url}">${label}</a>`;
+      ta.value = text.substring(0, start) + link + text.substring(end);
+      ta.focus();
+      updateCharCount();
+    }
+
+    function updateCharCount() {
+      const text = document.getElementById('c-text').value;
+      const previewImg = document.getElementById('image-preview-container');
+      const hasImage = previewImg.style.display === 'inline-block';
+      const limit = hasImage ? 1024 : 4096;
+      const count = text.length;
+      
+      const counter = document.getElementById('char-counter');
+      counter.textContent = `${count} / ${limit} caracteres`;
+      if (count > limit) {
+        counter.style.color = 'var(--danger)';
+      } else {
+        counter.style.color = 'var(--text-muted)';
+      }
+    }
+
+    function previewImage(input) {
+      if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = e => {
+          document.getElementById('image-preview').src = e.target.result;
+          document.getElementById('image-preview-container').style.display = 'inline-block';
+          document.getElementById('upload-zone').style.display = 'none';
+          currentImgRemoved = false;
+          updateCharCount();
+        };
+        reader.readAsDataURL(input.files[0]);
+      }
+    }
+
+    function removeImage() {
+      document.getElementById('c-image').value = '';
+      document.getElementById('image-preview').src = '';
+      document.getElementById('image-preview-container').style.display = 'none';
+      document.getElementById('upload-zone').style.display = 'block';
+      currentImgRemoved = true;
+      updateCharCount();
+    }
+
+    async function testDriveCampaign() {
+      const chatId = prompt('Digite o seu Chat ID do Telegram para receber o teste:', localStorage.getItem('last_test_chat_id') || '');
+      if (!chatId) return;
+      localStorage.setItem('last_test_chat_id', chatId);
+
+      const name = document.getElementById('c-name').value || 'Teste';
+      const formData = new FormData();
+      formData.append('name', name);
+      formData.append('message_text', document.getElementById('c-text').value);
+      
+      const imgFile = document.getElementById('c-image').files[0];
+      if (imgFile) formData.append('image', imgFile);
+      if (currentImgRemoved) formData.append('remove_image', 'true');
+      
+      const cId = document.getElementById('c-id').value;
+      if (cId) formData.append('campaign_id', cId);
+
+      const btns = [];
+      document.querySelectorAll('.btn-builder-row').forEach(row => {
+        const rowBtns = [];
+        row.querySelectorAll('.btn-builder-item').forEach(item => {
+          const t = item.querySelector('.btn-text').value;
+          const u = item.querySelector('.btn-url').value;
+          if (t && u) rowBtns.push({text: t, url: u});
+        });
+        if (rowBtns.length > 0) btns.push(rowBtns);
+      });
+      if (btns.length > 0) formData.append('buttons', JSON.stringify(btns));
+      
+      formData.append('test_chat_id', chatId);
+
+      try {
+        toast('Enviando teste...', 'info');
+        const res = await fetch('/api/campaigns/test', { method: 'POST', body: formData });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        toast('Teste enviado com sucesso!', 'success');
+      } catch (e) { toast('Falha no teste: ' + e.message, 'error'); }
+    }
+
+    async function saveCampaign() {
+      const id = document.getElementById('c-id').value;
+      const name = document.getElementById('c-name').value;
+      if (!name) return toast('Nome da campanha é obrigatório', 'warning');
+
+      const btn = document.querySelector('button[onclick="saveCampaign()"]');
+      const oldHtml = btn.innerHTML;
+      btn.innerHTML = '<span class="spinner" style="width:14px;height:14px;"></span> Salvando...';
+      btn.disabled = true;
+
+      const formData = new FormData();
+      formData.append('name', name);
+      formData.append('message_text', document.getElementById('c-text').value);
+      
+      const imgFile = document.getElementById('c-image').files[0];
+      if (imgFile) formData.append('image', imgFile);
+      if (currentImgRemoved) formData.append('remove_image', 'true');
+
+      const btns = [];
+      document.querySelectorAll('.btn-builder-row').forEach(row => {
+        const rowBtns = [];
+        row.querySelectorAll('.btn-builder-item').forEach(item => {
+          const t = item.querySelector('.btn-text').value;
+          const u = item.querySelector('.btn-url').value;
+          if (t && u) rowBtns.push({text: t, url: u});
+        });
+        if (rowBtns.length > 0) btns.push(rowBtns);
+      });
+      if (btns.length > 0) formData.append('buttons', JSON.stringify(btns));
+
+      const checked = [];
+      document.querySelectorAll('.channel-item.selected').forEach(el => checked.push(el.dataset.id));
+      formData.append('channel_ids', JSON.stringify(checked));
+
+      const url = id ? `/api/campaigns/${id}` : '/api/campaigns';
+      
+      try {
+        const method = id ? 'PUT' : 'POST';
+        const res = await fetch(url, { method, body: formData });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        
+        toast('Campanha salva com sucesso!');
+        if (!id) showEditor(data.id); // Reload in edit mode to show scheduler
+        else loadData();
+      } catch (e) { toast(e.message, 'error'); }
+      
+      btn.innerHTML = oldHtml;
+      btn.disabled = false;
+    }
+
+    async function deleteCampaign(id) {
+      showConfirm('Excluir Campanha', 'Deseja realmente excluir esta campanha?', async () => {
+        try {
+          await apiDelete(`/campaigns/${id}`);
+          toast('Excluída');
+          loadData();
+        } catch (e) { toast(e.message, 'error'); }
+      });
+    }
+
+    async function deleteMessages(id) {
+      showConfirm('Apagar Mensagens', 'Tem certeza? Isso vai APAGAR as mensagens desta campanha de todos os canais onde ela foi enviada.', async () => {
+        try {
+          toast('Apagando mensagens dos canais...', 'info');
+          const res = await apiDelete(`/campaigns/${id}/messages`);
+          toast(`Sucesso! ${res.deletedCount} mensagens apagadas.`);
+          loadData();
+        } catch (e) { toast(e.message, 'error'); }
+      });
+    }
+
+    async function openPreviewModal(id) {
+      try {
+        const campaign = await apiFetch(`/campaigns/${id}`);
+        
+        // Render Channels
+        const cList = document.getElementById('preview-channels-list');
+        if (!campaign.channels || campaign.channels.length === 0) {
+          cList.innerHTML = '<span style="color:var(--danger)">⚠️ Nenhum canal selecionado. Clique em Editar para vincular canais.</span>';
+          document.getElementById('btn-quick-dispatch').disabled = true;
+        } else {
+          cList.innerHTML = campaign.channels.map(c => `<div>• ${escapeHtml(c.name)}</div>`).join('');
+          document.getElementById('btn-quick-dispatch').disabled = false;
+        }
+
+        // Render Bubble Preview
+        let html = '';
+        if (campaign.image_path) {
+          html += `<img src="/uploads/${campaign.image_path.split('/').pop()}" alt="Imagem" style="max-height: 300px; object-fit: cover;">`;
+        }
+        
+        // Format text: replace newlines with <br> to render in HTML correctly
+        let text = (campaign.message_text || '').replace(/\n/g, '<br>');
+        // Simple regex replace for standard tags since it's HTML mode
+        // For tg-spoiler:
+        text = text.replace(/<tg-spoiler>/g, '<span style="background:rgba(255,255,255,0.2); color:transparent; border-radius:4px; padding:0 2px">').replace(/<\/tg-spoiler>/g, '</span>');
+        
+        html += `<div>${text}</div>`;
+
+        if (campaign.buttons) {
+          try {
+            const btns = JSON.parse(campaign.buttons);
+            for (const row of btns) {
+              html += `<div class="tg-inline-row">`;
+              const r = Array.isArray(row) ? row : [row];
+              for (const b of r) {
+                html += `<a href="${b.url}" target="_blank" class="tg-inline-btn">${b.text}</a>`;
+              }
+              html += `</div>`;
+            }
+          } catch(e){}
+        }
+
+        document.getElementById('tg-preview-bubble').innerHTML = html;
+        
+        // Setup dispatch action
+        document.getElementById('btn-quick-dispatch').onclick = async () => {
+          try {
+            document.getElementById('btn-quick-dispatch').disabled = true;
+            await apiPost(`/campaigns/${id}/send`, { schedule_type: 'immediate' });
+            toast('Disparo iniciado!');
+            closeModal('preview-modal');
+            setTimeout(() => showList(), 1500);
+          } catch(e) {
+            toast(e.message, 'error');
+            document.getElementById('btn-quick-dispatch').disabled = false;
+          }
+        };
+
+        openModal('preview-modal');
+      } catch (e) {
+        toast('Erro ao carregar prévia: ' + e.message, 'error');
+      }
+    }
+
+    function setSchedTab(type) {
+      schedType = type;
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      event.target.classList.add('active');
+      
+      document.getElementById('sched-immediate').style.display = type === 'immediate' ? 'block' : 'none';
+      document.getElementById('sched-once').style.display = type === 'once' ? 'block' : 'none';
+      document.getElementById('sched-recurring').style.display = type === 'recurring' ? 'block' : 'none';
+    }
+
+    async function dispatchCampaign() {
+      const id = document.getElementById('c-id').value;
+      if (!id) return toast('Salve a campanha primeiro', 'warning');
+
+      const selectedCh = document.querySelectorAll('.channel-item.selected');
+      if (selectedCh.length === 0) {
+        return toast('Selecione pelo menos um canal de destino', 'warning');
+      }
+
+      const payload = { schedule_type: schedType };
+      if (schedType === 'once') {
+        const dt = document.getElementById('sched-datetime').value;
+        if (!dt) return toast('Selecione data e hora', 'warning');
+        payload.run_at = new Date(dt).toISOString();
+      } else if (schedType === 'recurring') {
+        const c = document.getElementById('sched-cron').value;
+        if (!c) return toast('Insira o cron', 'warning');
+        payload.cron_expr = c;
+      }
+
+      try {
+        await apiPost(`/campaigns/${id}/send`, payload);
+        toast(schedType === 'immediate' ? 'Disparo iniciado!' : 'Disparo agendado!');
+        setTimeout(() => showList(), 2000);
+      } catch (e) { toast(e.message, 'error'); }
+    }
+
+    function toggleSelectAllChannels() {
+      const allSelected = document.querySelectorAll('.channel-item:not(.selected)').length === 0;
+      if (allSelected) {
+        document.querySelectorAll('.channel-item').forEach(el => el.classList.remove('selected'));
+        document.getElementById('btn-select-all').textContent = 'Selecionar Todos';
+      } else {
+        document.querySelectorAll('.channel-item').forEach(el => el.classList.add('selected'));
+        document.getElementById('btn-select-all').textContent = 'Desmarcar Todos';
+      }
+    }
+
+    // Update the button text when manually clicking channels
+    document.addEventListener('click', e => {
+      const channelItem = e.target.closest('.channel-item');
+      if (channelItem) {
+        // give it a tiny delay to let the toggle happen
+        setTimeout(() => {
+          const allSelected = document.querySelectorAll('.channel-item:not(.selected)').length === 0;
+          document.getElementById('btn-select-all').textContent = allSelected ? 'Desmarcar Todos' : 'Selecionar Todos';
+        }, 10);
+      }
+    });
+
+    loadData();
+  </script>
+</body>
+</html>

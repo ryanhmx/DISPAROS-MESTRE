@@ -1,0 +1,9 @@
+node_modules/
+npm-debug.log
+.DS_Store
+.env
+
+# Ignorar o banco de dados local para não sobrescrever o de produção,
+# mas garantir que a pasta data exista
+backend/data/*
+!backend/data/.gitkeep

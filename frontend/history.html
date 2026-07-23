@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Histórico — Disparos do Mestre</title>
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon">🚀</div>
+      <div>
+        <div class="logo-text">Disparos do Mestre</div>
+        <div class="logo-sub">Sistema de Disparos</div>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-title">Menu Principal</div>
+      <a href="index.html" class="nav-link"><span class="nav-icon">📊</span> Dashboard</a>
+      <a href="campaigns.html" class="nav-link"><span class="nav-icon">📝</span> Campanhas</a>
+      <a href="channels.html" class="nav-link"><span class="nav-icon">📡</span> Canais</a>
+      <a href="history.html" class="nav-link active"><span class="nav-icon">🕒</span> Histórico</a>
+    </nav>
+  </aside>
+
+  <main class="main-wrapper">
+    <header class="topbar">
+      <div class="flex-center">
+        <button class="menu-toggle" onclick="toggleMenu()">☰</button>
+        <div>
+          <h1 class="topbar-title">Histórico e Logs</h1>
+          <div class="topbar-subtitle">Acompanhe os resultados dos disparos realizados</div>
+        </div>
+      </div>
+    </header>
+
+    <div class="page-content">
+      <div class="card mb-4" style="display:flex; gap: 16px; padding: 16px 22px;">
+        <div style="flex:1">
+          <label class="form-label">Filtrar Status</label>
+          <select id="filter-status" class="form-control" onchange="currentPage=1; loadLog()">
+            <option value="">Todos</option>
+            <option value="success">✅ Sucesso</option>
+            <option value="failed">❌ Falha</option>
+          </select>
+        </div>
+        <div style="flex:2">
+          <label class="form-label">Filtrar por Campanha (Opcional)</label>
+          <select id="filter-campaign" class="form-control" onchange="currentPage=1; loadLog()">
+            <option value="">Todas as Campanhas</option>
+          </select>
+        </div>
+        <div style="display:flex; align-items:flex-end">
+          <button class="btn btn-secondary" onclick="loadLog()">🔄 Atualizar</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Data/Hora</th>
+                <th>Campanha</th>
+                <th>Canal</th>
+                <th>Status</th>
+                <th>Detalhes (Erro)</th>
+              </tr>
+            </thead>
+            <tbody id="log-tbody">
+              <tr><td colspan="5" class="empty-state-desc">Carregando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+        
+        <div class="flex-between mt-4" style="padding-top:16px; border-top: 1px solid var(--border)">
+          <div style="color:var(--text-muted); font-size:0.85rem" id="pagination-info">Mostrando 0 - 0 de 0</div>
+          <div class="flex gap-2">
+            <button class="btn btn-secondary btn-sm" id="btn-prev" onclick="changePage(-1)">Anterior</button>
+            <button class="btn btn-secondary btn-sm" id="btn-next" onclick="changePage(1)">Próxima</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <div id="toast-container"></div>
+  <script src="assets/app.js"></script>
+  <script>
+    let currentPage = 1;
+    const limit = 20;
+
+    async function loadFilters() {
+      try {
+        const campaigns = await apiFetch('/campaigns');
+        const sel = document.getElementById('filter-campaign');
+        campaigns.forEach(c => {
+          const opt = document.createElement('option');
+          opt.value = c.id;
+          opt.textContent = c.name;
+          sel.appendChild(opt);
+        });
+      } catch(e){}
+    }
+
+    async function loadLog() {
+      const status = document.getElementById('filter-status').value;
+      const campId = document.getElementById('filter-campaign').value;
+      
+      let q = `?page=${currentPage}&limit=${limit}`;
+      if (status) q += `&status=${status}`;
+      if (campId) q += `&campaign_id=${campId}`;
+
+      try {
+        const data = await apiFetch(`/stats/log${q}`);
+        
+        const tb = document.getElementById('log-tbody');
+        if (data.logs.length === 0) {
+          tb.innerHTML = '<tr><td colspan="5" class="empty-state-desc" style="text-align:center;padding:30px">Nenhum registro encontrado.</td></tr>';
+        } else {
+          tb.innerHTML = data.logs.map(l => `
+            <tr>
+              <td>${fmtDate(l.sent_at)}</td>
+              <td><strong>${escapeHtml(l.campaign_name)}</strong></td>
+              <td>${escapeHtml(l.channel_name)}</td>
+              <td>${l.status === 'success' ? '<span class="status-badge status-sent">Sucesso</span>' : (l.status === 'deleted' ? '<span class="status-badge status-deleted">Apagado</span>' : '<span class="status-badge status-failed">Falha</span>')}</td>
+              <td style="max-width:300px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${escapeHtml(l.error_message || '')}">${escapeHtml(l.error_message || '-')}</td>
+            </tr>
+          `).join('');
+        }
+
+        const total = data.total;
+        const start = (currentPage - 1) * limit + 1;
+        const end = Math.min(start + limit - 1, total);
+        document.getElementById('pagination-info').textContent = total > 0 ? `Mostrando ${start} - ${end} de ${total}` : 'Nenhum resultado';
+        
+        document.getElementById('btn-prev').disabled = currentPage === 1;
+        document.getElementById('btn-next').disabled = end >= total;
+
+      } catch (e) { toast('Erro ao carregar histórico', 'error'); }
+    }
+
+    function changePage(delta) {
+      currentPage += delta;
+      if (currentPage < 1) currentPage = 1;
+      loadLog();
+    }
+
+    loadFilters();
+    loadLog();
+  </script>
+</body>
+</html>

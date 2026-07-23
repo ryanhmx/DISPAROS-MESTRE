@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Canais — Disparos do Mestre</title>
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon">🚀</div>
+      <div>
+        <div class="logo-text">Disparos do Mestre</div>
+        <div class="logo-sub">Sistema de Disparos</div>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-title">Menu Principal</div>
+      <a href="index.html" class="nav-link"><span class="nav-icon">📊</span> Dashboard</a>
+      <a href="campaigns.html" class="nav-link"><span class="nav-icon">📝</span> Campanhas</a>
+      <a href="channels.html" class="nav-link active"><span class="nav-icon">📡</span> Canais</a>
+      <a href="history.html" class="nav-link"><span class="nav-icon">🕒</span> Histórico</a>
+    </nav>
+  </aside>
+
+  <main class="main-wrapper">
+    <header class="topbar">
+      <div class="flex-center">
+        <button class="menu-toggle" onclick="toggleMenu()">☰</button>
+        <div>
+          <h1 class="topbar-title">Canais do Telegram</h1>
+          <div class="topbar-subtitle">Gerencie os canais onde o bot enviará as mensagens</div>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <input type="text" id="search-channel" class="form-control" placeholder="🔍 Buscar canal..." oninput="renderChannels()" style="width:250px;">
+        <button class="btn btn-secondary" onclick="openBulkModal()">➕ Adicionar em Massa</button>
+        <button class="btn btn-primary" onclick="openChannelModal()">➕ Adicionar Canal</button>
+      </div>
+    </header>
+
+    <div class="page-content">
+
+      <div class="card">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Nome / Username</th>
+                <th>Chat ID</th>
+                <th>Status</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody id="channels-tbody">
+              <tr><td colspan="4" class="empty-state-desc">Carregando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Add/Edit Channel Modal -->
+  <div class="modal-overlay" id="channel-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 class="modal-title" id="cm-title">Adicionar Canal</h2>
+        <button class="btn-icon" onclick="closeModal('channel-modal')">✖</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="cm-id">
+        <div class="form-group">
+          <label class="form-label">Nome de exibição</label>
+          <input type="text" id="cm-name" class="form-control" placeholder="Ex: Meu Canal Principal">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Chat ID <span style="color:var(--danger)">*</span></label>
+          <input type="text" id="cm-chatid" class="form-control" placeholder="Ex: -100123456789">
+          <div class="form-hint">Obrigatório. Encaminhe uma mensagem do canal para o @RawDataBot para descobrir o ID. Deve começar com -100.</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Username (Opcional)</label>
+          <input type="text" id="cm-username" class="form-control" placeholder="Ex: @meucanal">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('channel-modal')">Cancelar</button>
+        <button class="btn btn-primary" onclick="saveChannel()">Salvar Canal</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bulk Add Modal -->
+  <div class="modal-overlay" id="bulk-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 class="modal-title">Adicionar Canais em Massa</h2>
+        <button class="modal-close" onclick="closeModal('bulk-modal')">✖</button>
+      </div>
+      <div class="modal-body">
+        <form onsubmit="bulkAddChannels(event)">
+          <div class="form-group">
+            <label>Canais (um por linha)</label>
+            <p style="font-size:0.8rem; color:var(--text-muted); margin-bottom:8px;">Formato: <strong>Nome, ChatID</strong></p>
+            <textarea id="bulk-text" class="form-control" rows="8" placeholder="Exemplo:&#10;Canal Oficial, -10012345678&#10;Grupo Secreto, -10044455588"></textarea>
+          </div>
+          <div class="flex" style="justify-content: flex-end; gap: 10px;">
+            <button type="button" class="btn btn-secondary" onclick="closeModal('bulk-modal')">Cancelar</button>
+            <button type="submit" class="btn btn-primary">Importar</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast-container"></div>
+  <script src="assets/app.js"></script>
+  <script>
+    let channels = [];
+
+    async function loadChannels() {
+      try {
+        channels = await apiFetch('/channels');
+        renderChannels();
+      } catch (e) {
+        toast('Erro ao carregar canais', 'error');
+      }
+    }
+
+    function renderChannels() {
+      const tb = document.getElementById('channels-tbody');
+      const searchTerm = (document.getElementById('search-channel')?.value || '').toLowerCase();
+      
+      const filtered = channels.filter(c => 
+        c.name.toLowerCase().includes(searchTerm) || 
+        (c.username && c.username.toLowerCase().includes(searchTerm)) ||
+        c.chat_id.toLowerCase().includes(searchTerm)
+      );
+
+      if (filtered.length === 0) {
+        tb.innerHTML = '<tr><td colspan="4" class="empty-state">Nenhum canal encontrado.</td></tr>';
+        return;
+      }
+      tb.innerHTML = filtered.map(c => `
+        <tr>
+          <td>
+            <div style="font-weight:600">${escapeHtml(c.name)}</div>
+            <div style="font-size:0.75rem;color:var(--text-muted)">${escapeHtml(c.username || 'Sem username')}</div>
+          </td>
+          <td style="font-family:monospace;color:var(--text-secondary)">${escapeHtml(c.chat_id)}</td>
+          <td>
+            <div style="display:flex; align-items:center; gap:8px;">
+               <label class="toggle-switch">
+                  <input type="checkbox" ${c.active ? 'checked' : ''} onchange="toggleChannel('${c.id}', ${c.active})">
+                  <span class="slider"></span>
+               </label>
+               ${c.verified ? '<span class="badge badge-success">Verificado</span>' : '<span class="badge badge-warning">Não Verificado</span>'}
+            </div>
+          </td>
+          <td>
+            <button class="btn btn-sm btn-secondary" onclick="verifyChannel('${c.id}')" title="Testar Conexão">🔄 Testar</button>
+            <button class="btn btn-sm btn-secondary" onclick="editChannel('${c.id}')">✏️ Editar</button>
+            <button class="btn btn-sm btn-danger" onclick="deleteChannel('${c.id}')">🗑️</button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function openChannelModal() {
+      document.getElementById('cm-title').textContent = 'Adicionar Canal';
+      document.getElementById('cm-id').value = '';
+      document.getElementById('cm-name').value = '';
+      document.getElementById('cm-chatid').value = '';
+      document.getElementById('cm-username').value = '';
+      openModal('channel-modal');
+    }
+
+    function editChannel(id) {
+      const c = channels.find(x => x.id === id);
+      if (!c) return;
+      document.getElementById('cm-title').textContent = 'Editar Canal';
+      document.getElementById('cm-id').value = c.id;
+      document.getElementById('cm-name').value = c.name;
+      document.getElementById('cm-chatid').value = c.chat_id;
+      document.getElementById('cm-username').value = c.username || '';
+      openModal('channel-modal');
+    }
+
+    async function saveChannel() {
+      const id = document.getElementById('cm-id').value;
+      const data = {
+        name: document.getElementById('cm-name').value,
+        chat_id: document.getElementById('cm-chatid').value,
+        username: document.getElementById('cm-username').value
+      };
+      if (!data.name || !data.chat_id) return toast('Nome e Chat ID são obrigatórios', 'warning');
+      
+      const btn = document.querySelector('#channel-modal .btn-primary');
+      let oldHtml = 'Salvar';
+      if (btn) {
+        oldHtml = btn.innerHTML;
+        btn.innerHTML = '<span class="spinner" style="width:14px;height:14px"></span> Salvando...';
+        btn.disabled = true;
+      }
+
+      try {
+        if (id) await apiPut(`/channels/${id}`, data);
+        else await apiPost('/channels', data);
+        toast('Canal salvo!');
+        closeModal('channel-modal');
+        loadChannels();
+      } catch (e) { toast(e.message, 'error'); }
+      
+      if (btn) {
+        btn.innerHTML = oldHtml;
+        btn.disabled = false;
+      }
+    }
+
+    async function verifyChannel(id) {
+      toast('Verificando conexão...', 'info');
+      try {
+        const res = await apiPost(`/channels/${id}/verify`);
+        if (res.ok) {
+          toast(`Conectado! Canal: ${res.title}`);
+          loadChannels();
+        } else {
+          toast(`Falha: ${res.error}`, 'error');
+        }
+      } catch (e) { toast(e.message, 'error'); }
+    }
+
+    async function deleteChannel(id) {
+      showConfirm('Excluir Canal', 'Tem certeza que deseja excluir este canal?', async () => {
+        try {
+          await apiDelete(`/channels/${id}`);
+          toast('Canal excluído');
+          loadChannels();
+        } catch (e) { toast(e.message, 'error'); }
+      });
+    }
+
+    async function toggleChannel(id, currentActive) {
+      try {
+        await apiPut(`/channels/${id}`, { active: currentActive ? 0 : 1 });
+        loadChannels();
+      } catch (e) {
+        toast(e.message, 'error');
+        loadChannels();
+      }
+    }
+
+    function openBulkModal() {
+      document.getElementById('bulk-text').value = '';
+      openModal('bulk-modal');
+    }
+
+    async function bulkAddChannels(e) {
+      e.preventDefault();
+      const text = document.getElementById('bulk-text').value;
+      const lines = text.split('\n');
+      const channelsToAdd = [];
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        const parts = line.split(',');
+        if (parts.length >= 2) {
+          channelsToAdd.push({
+            name: parts[0].trim(),
+            chat_id: parts[1].trim()
+          });
+        }
+      }
+      if (channelsToAdd.length === 0) return toast('Nenhum canal válido encontrado. Verifique o formato.', 'warning');
+      
+      const btn = e.target.querySelector('button[type="submit"]');
+      const oldHtml = btn.innerHTML;
+      btn.innerHTML = '<span class="spinner" style="width:14px;height:14px;"></span> Importando...';
+      btn.disabled = true;
+
+      try {
+        const res = await apiPost('/channels/bulk', { channels: channelsToAdd });
+        toast(`${res.added} canais importados com sucesso!`, 'success');
+        closeModal('bulk-modal');
+        loadChannels();
+      } catch (err) {
+        toast(err.message, 'error');
+      }
+      btn.innerHTML = oldHtml;
+      btn.disabled = false;
+    }
+
+    loadChannels();
+  </script>
+</body>
+</html>
