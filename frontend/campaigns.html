@@ -213,6 +213,23 @@
     </div>
   </div>
 
+  <!-- Unsaved Changes Modal -->
+  <div class="modal-overlay" id="unsaved-modal" style="display:none; z-index:9999;">
+    <div class="modal-box" style="max-width:420px;">
+      <div class="modal-header">
+        <h3 class="modal-title">⚠️ Alterações não salvas</h3>
+      </div>
+      <div class="modal-body">
+        <p style="color:var(--text-secondary); margin:0;">Você fez alterações nesta campanha que ainda não foram salvas. O que deseja fazer?</p>
+      </div>
+      <div class="modal-footer" style="gap:10px; justify-content:flex-end;">
+        <button class="btn btn-ghost" onclick="closeModal('unsaved-modal')">Continuar editando</button>
+        <button class="btn btn-secondary" id="btn-leave-without-save">Sair sem salvar</button>
+        <button class="btn btn-primary" id="btn-save-and-leave">💾 Salvar e sair</button>
+      </div>
+    </div>
+  </div>
+
   <div id="toast-container"></div>
   <script src="assets/app.js"></script>
   <script>
@@ -220,6 +237,8 @@
     let channels = [];
     let schedType = 'immediate';
     let currentImgRemoved = false;
+    let isDirty = false;      // tracks unsaved changes
+    let _pendingLeaveAction = null; // callback when user confirms leave
 
     async function loadData() {
       try {
@@ -277,10 +296,23 @@
       `).join('');
     }
 
-    function showList() {
+    function _doShowList() {
+      isDirty = false;
       document.getElementById('view-list').style.display = 'block';
       document.getElementById('view-editor').style.display = 'none';
       loadData();
+    }
+
+    function showList() {
+      const editorVisible = document.getElementById('view-editor').style.display !== 'none';
+      if (editorVisible && isDirty) {
+        _pendingLeaveAction = () => _doShowList();
+        document.getElementById('btn-leave-without-save').onclick = () => { closeModal('unsaved-modal'); _pendingLeaveAction(); };
+        document.getElementById('btn-save-and-leave').onclick = () => { closeModal('unsaved-modal'); saveCampaign(true); };
+        document.getElementById('unsaved-modal').style.display = 'flex';
+      } else {
+        _doShowList();
+      }
     }
 
     async function showEditor(id = null) {
@@ -292,6 +324,10 @@
 
       // Deselect all channels
       document.querySelectorAll('.channel-item').forEach(el => el.classList.remove('selected'));
+
+      // Reset dirty state when opening editor
+      isDirty = false;
+      setTimeout(() => markDirtyOnChange(), 300);
 
       if (!id) {
         document.getElementById('editor-title').textContent = 'Nova Campanha';
@@ -498,7 +534,20 @@
       } catch (e) { toast('Falha no teste: ' + e.message, 'error'); }
     }
 
-    async function saveCampaign() {
+    // Track changes to mark form as dirty
+    function markDirtyOnChange() {
+      ['c-name', 'c-text'].forEach(fieldId => {
+        const el = document.getElementById(fieldId);
+        if (el) el.addEventListener('input', () => { isDirty = true; });
+      });
+      document.querySelectorAll('.channel-item').forEach(el => {
+        el.addEventListener('click', () => { isDirty = true; });
+      });
+      const imgInput = document.getElementById('c-image');
+      if (imgInput) imgInput.addEventListener('change', () => { isDirty = true; });
+    }
+
+    async function saveCampaign(leaveAfterSave = false) {
       const id = document.getElementById('c-id').value;
       const name = document.getElementById('c-name').value;
       if (!name) return toast('Nome da campanha é obrigatório', 'warning');
@@ -540,9 +589,15 @@
         const data = await res.json();
         if (!res.ok) throw new Error(data.error);
         
+        isDirty = false;
         toast('Campanha salva com sucesso!');
-        if (!id) showEditor(data.id); // Reload in edit mode to show scheduler
-        else loadData();
+        if (leaveAfterSave) {
+          setTimeout(() => _doShowList(), 500);
+        } else if (!id) {
+          showEditor(data.id); // Reload in edit mode to show scheduler
+        } else {
+          loadData();
+        }
       } catch (e) { toast(e.message, 'error'); }
       
       btn.innerHTML = oldHtml;
@@ -692,6 +747,20 @@
           document.getElementById('btn-select-all').textContent = allSelected ? 'Desmarcar Todos' : 'Selecionar Todos';
         }, 10);
       }
+    });
+
+    // Intercept sidebar nav links when editor has unsaved changes
+    document.querySelectorAll('.nav-link').forEach(link => {
+      link.addEventListener('click', e => {
+        const editorVisible = document.getElementById('view-editor').style.display !== 'none';
+        if (editorVisible && isDirty) {
+          e.preventDefault();
+          const href = link.href;
+          document.getElementById('btn-leave-without-save').onclick = () => { closeModal('unsaved-modal'); window.location.href = href; };
+          document.getElementById('btn-save-and-leave').onclick = () => { closeModal('unsaved-modal'); saveCampaign(false).then(() => { window.location.href = href; }); };
+          document.getElementById('unsaved-modal').style.display = 'flex';
+        }
+      });
     });
 
     loadData();
