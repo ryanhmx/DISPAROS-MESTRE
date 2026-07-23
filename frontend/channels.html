@@ -59,6 +59,7 @@
             </tbody>
           </table>
         </div>
+        <div class="pagination" id="channels-pagination"></div>
       </div>
     </div>
   </main>
@@ -120,6 +121,8 @@
   <script src="assets/app.js"></script>
   <script>
     let channels = [];
+    let channelPage = 1;
+    const PAGE_SIZE = 15;
 
     async function loadChannels() {
       try {
@@ -140,33 +143,40 @@
         c.chat_id.toLowerCase().includes(searchTerm)
       );
 
-      if (filtered.length === 0) {
+      const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+      if (channelPage > totalPages) channelPage = totalPages;
+      const start = (channelPage - 1) * PAGE_SIZE;
+      const paginated = filtered.slice(start, start + PAGE_SIZE);
+
+      if (paginated.length === 0) {
         tb.innerHTML = '<tr><td colspan="4" class="empty-state">Nenhum canal encontrado.</td></tr>';
-        return;
+      } else {
+        tb.innerHTML = paginated.map(c => `
+          <tr>
+            <td>
+              <div style="font-weight:600">${escapeHtml(c.name)}</div>
+              <div style="font-size:0.75rem;color:var(--text-muted)">${escapeHtml(c.username || 'Sem username')}</div>
+            </td>
+            <td style="font-family:monospace;color:var(--text-secondary)">${escapeHtml(c.chat_id)}</td>
+            <td>
+              <div style="display:flex; align-items:center; gap:8px;">
+                 <label class="toggle-switch">
+                    <input type="checkbox" ${c.active ? 'checked' : ''} onchange="toggleChannel('${c.id}', ${c.active})">
+                    <span class="slider"></span>
+                 </label>
+                 ${c.verified ? '<span class="badge badge-success">Verificado</span>' : '<span class="badge badge-warning">Não Verificado</span>'}
+              </div>
+            </td>
+            <td>
+              <button class="btn btn-sm btn-secondary" onclick="verifyChannel('${c.id}')" title="Testar Conexão">🔄 Testar</button>
+              <button class="btn btn-sm btn-secondary" onclick="editChannel('${c.id}')">✏️ Editar</button>
+              <button class="btn btn-sm btn-danger" onclick="deleteChannel('${c.id}')">🗑️</button>
+            </td>
+          </tr>
+        `).join('');
       }
-      tb.innerHTML = filtered.map(c => `
-        <tr>
-          <td>
-            <div style="font-weight:600">${escapeHtml(c.name)}</div>
-            <div style="font-size:0.75rem;color:var(--text-muted)">${escapeHtml(c.username || 'Sem username')}</div>
-          </td>
-          <td style="font-family:monospace;color:var(--text-secondary)">${escapeHtml(c.chat_id)}</td>
-          <td>
-            <div style="display:flex; align-items:center; gap:8px;">
-               <label class="toggle-switch">
-                  <input type="checkbox" ${c.active ? 'checked' : ''} onchange="toggleChannel('${c.id}', ${c.active})">
-                  <span class="slider"></span>
-               </label>
-               ${c.verified ? '<span class="badge badge-success">Verificado</span>' : '<span class="badge badge-warning">Não Verificado</span>'}
-            </div>
-          </td>
-          <td>
-            <button class="btn btn-sm btn-secondary" onclick="verifyChannel('${c.id}')" title="Testar Conexão">🔄 Testar</button>
-            <button class="btn btn-sm btn-secondary" onclick="editChannel('${c.id}')">✏️ Editar</button>
-            <button class="btn btn-sm btn-danger" onclick="deleteChannel('${c.id}')">🗑️</button>
-          </td>
-        </tr>
-      `).join('');
+
+      renderPagination('channels-pagination', channelPage, totalPages, filtered.length, (p) => { channelPage = p; renderChannels(); });
     }
 
     function openChannelModal() {

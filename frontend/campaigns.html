@@ -75,6 +75,7 @@
             </tbody>
           </table>
         </div>
+        <div class="pagination" id="campaigns-pagination"></div>
       </div>
 
       <!-- Editor View -->
@@ -239,6 +240,8 @@
     let currentImgRemoved = false;
     let isDirty = false;      // tracks unsaved changes
     let _pendingLeaveAction = null; // callback when user confirms leave
+    let campaignPage = 1;
+    const CAMP_PAGE_SIZE = 15;
 
     async function loadData() {
       try {
@@ -263,24 +266,31 @@
         return matchName && matchStatus;
       });
 
-      if (filtered.length === 0) {
+      const totalPages = Math.max(1, Math.ceil(filtered.length / CAMP_PAGE_SIZE));
+      if (campaignPage > totalPages) campaignPage = totalPages;
+      const start = (campaignPage - 1) * CAMP_PAGE_SIZE;
+      const paginated = filtered.slice(start, start + CAMP_PAGE_SIZE);
+
+      if (paginated.length === 0) {
         tb.innerHTML = '<tr><td colspan="4" class="empty-state">Nenhuma campanha encontrada.</td></tr>';
-        return;
+      } else {
+        tb.innerHTML = paginated.map(c => `
+          <tr>
+            <td><strong>${escapeHtml(c.name)}</strong></td>
+            <td>${statusBadge(c.status)}</td>
+            <td>${fmtDate(c.created_at)}</td>
+            <td style="display: flex; gap: 8px; align-items: center;">
+              <button class="btn btn-sm btn-secondary" onclick="editCampaign('${c.id}')">✏️ Editar</button>
+              <button class="btn btn-sm btn-danger" onclick="deleteMessages('${c.id}')" title="Apagar mensagens enviadas do Telegram">🧹 Apagar</button>
+              <button class="btn btn-sm btn-danger" onclick="deleteCampaign('${c.id}')" title="Excluir Campanha">🗑️</button>
+              <div style="flex: 1;"></div>
+              <button class="btn btn-success" onclick="openPreviewModal('${c.id}')" title="Ver Prévia e Disparar" style="padding: 8px 20px; font-weight: bold;">🚀 Enviar Campanha</button>
+            </td>
+          </tr>
+        `).join('');
       }
-      tb.innerHTML = filtered.map(c => `
-        <tr>
-          <td><strong>${escapeHtml(c.name)}</strong></td>
-          <td>${statusBadge(c.status)}</td>
-          <td>${fmtDate(c.created_at)}</td>
-          <td style="display: flex; gap: 8px; align-items: center;">
-            <button class="btn btn-sm btn-secondary" onclick="editCampaign('${c.id}')">✏️ Editar</button>
-            <button class="btn btn-sm btn-danger" onclick="deleteMessages('${c.id}')" title="Apagar mensagens enviadas do Telegram">🧹 Apagar</button>
-            <button class="btn btn-sm btn-danger" onclick="deleteCampaign('${c.id}')" title="Excluir Campanha">🗑️</button>
-            <div style="flex: 1;"></div>
-            <button class="btn btn-success" onclick="openPreviewModal('${c.id}')" title="Ver Prévia e Disparar" style="padding: 8px 20px; font-weight: bold;">🚀 Enviar Campanha</button>
-          </td>
-        </tr>
-      `).join('');
+
+      renderPagination('campaigns-pagination', campaignPage, totalPages, filtered.length, (p) => { campaignPage = p; renderCampaigns(); });
     }
 
     function renderChannels() {

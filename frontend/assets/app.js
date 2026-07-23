@@ -36,6 +36,34 @@ function toggleMenu() {
   if (sidebar) sidebar.classList.toggle('open');
 }
 
+// ── Pagination ─────────────────────────────────────────────────────────
+function renderPagination(containerId, currentPage, totalPages, totalItems, onPageChange) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  if (totalPages <= 1) { el.innerHTML = ''; return; }
+
+  const start = (currentPage - 1) * 15 + 1;
+  const end = Math.min(currentPage * 15, totalItems);
+
+  let pages = '';
+  for (let i = 1; i <= totalPages; i++) {
+    if (totalPages > 7 && i > 2 && i < totalPages - 1 && Math.abs(i - currentPage) > 1) {
+      if (i === 3 || i === totalPages - 2) pages += `<span style="padding:0 4px;color:var(--text-muted)">…</span>`;
+      continue;
+    }
+    pages += `<button class="page-btn ${i === currentPage ? 'active' : ''}" onclick="(${onPageChange.toString()})(${i})">${i}</button>`;
+  }
+
+  el.innerHTML = `
+    <span class="pagination-info">Mostrando ${start}–${end} de ${totalItems}</span>
+    <div class="pagination-controls">
+      <button class="page-btn" onclick="(${onPageChange.toString()})(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}>‹ Anterior</button>
+      ${pages}
+      <button class="page-btn" onclick="(${onPageChange.toString()})(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}>Próximo ›</button>
+    </div>
+  `;
+}
+
 function showConfirm(title, message, onConfirm) {
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay open';

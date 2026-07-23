@@ -52,7 +52,7 @@ body {
   font-family: 'Inter', system-ui, sans-serif;
   background: var(--bg-base);
   color: var(--text-primary);
-  min-height: 100vh;
+  height: 100vh;
   display: flex;
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
@@ -199,15 +199,15 @@ input, textarea, select { font-family: inherit; }
 .bot-status-name { color: var(--text-primary); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .bot-status-label { color: var(--text-muted); font-size: 0.7rem; }
 
-/* ── Main Layout ─────────────────────────────────*/
 .main-wrapper {
   margin-left: var(--sidebar-w);
   flex: 1;
-  min-height: 100vh;
+  height: 100vh;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
 }
+
 
 .topbar {
   min-height: var(--topbar-h);
@@ -391,6 +391,32 @@ input, textarea, select { font-family: inherit; }
 
 /* ── Tables ──────────────────────────────────────*/
 .table-wrap { overflow-x: auto; border-radius: var(--radius); }
+
+/* ── Pagination ───────────────────────────────────*/
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 4px 4px;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.pagination-info { font-size: 0.8rem; color: var(--text-muted); }
+.pagination-controls { display: flex; align-items: center; gap: 6px; }
+.page-btn {
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.page-btn:hover:not(:disabled) { background: var(--primary); color: #fff; border-color: var(--primary); }
+.page-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); font-weight: 600; }
+.page-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
 
 table {
   width: 100%;
