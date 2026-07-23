@@ -265,12 +265,12 @@
       const channelsToAdd = [];
       for (const line of lines) {
         if (!line.trim()) continue;
-        const parts = line.split(',');
-        if (parts.length >= 2) {
-          channelsToAdd.push({
-            name: parts[0].trim(),
-            chat_id: parts[1].trim()
-          });
+        const lastComma = line.lastIndexOf(',');
+        if (lastComma === -1) continue;
+        const name = line.substring(0, lastComma).trim();
+        const chat_id = line.substring(lastComma + 1).trim();
+        if (name && chat_id) {
+          channelsToAdd.push({ name, chat_id });
         }
       }
       if (channelsToAdd.length === 0) return toast('Nenhum canal válido encontrado. Verifique o formato.', 'warning');

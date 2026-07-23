@@ -18,7 +18,12 @@ function toast(msg, type = 'success') {
 }
 
 // ── Modal helpers ──────────────────────────────────────────────────────
-function openModal(id) { document.getElementById(id)?.classList.add('open'); }
+function openModal(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.style.display = '';
+  el.classList.add('open');
+}
 function closeModal(id) {
   const el = document.getElementById(id);
   if (!el) return;
