@@ -20,7 +20,10 @@ function toast(msg, type = 'success') {
 // ── Modal helpers ──────────────────────────────────────────────────────
 function openModal(id) { document.getElementById(id)?.classList.add('open'); }
 function closeModal(id) {
-  document.getElementById(id)?.classList.remove('open');
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.classList.remove('open');
+  el.style.display = 'none';
 }
 
 function toggleMenu() {
