@@ -10,9 +10,6 @@ RUN cd backend && npm install --production
 # Copy all source code
 COPY . .
 
-# Create volume for persistent SQLite database and uploads
-VOLUME ["/app/backend/data"]
-
 # Expose port
 EXPOSE 3131
 
