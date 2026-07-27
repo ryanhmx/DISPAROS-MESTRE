@@ -1,9 +1,9 @@
 /* ── Shared layout shell (sidebar + topbar) included in every page ── */
 
 // Dynamic API URL: uses same host in production, localhost in dev
-const API = window.location.hostname === 'localhost'
-  ? 'http://localhost:3131/api'
-  : `${window.location.origin}/api`;
+const IS_LOCAL = window.location.hostname === 'localhost';
+const BASE_URL = IS_LOCAL ? 'http://localhost:3131' : window.location.origin;
+const API = `${BASE_URL}/api`;
 
 // ── Toast ─────────────────────────────────────────────────────────────
 function toast(msg, type = 'success') {

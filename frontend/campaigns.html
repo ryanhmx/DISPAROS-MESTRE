@@ -355,7 +355,7 @@
           
           if (c.image_path) {
             const filename = c.image_path.split(/[\\/]/).pop();
-            const url = `http://localhost:3131/uploads/${filename}`;
+            const url = `${BASE_URL}/uploads/${filename}`;
             document.getElementById('image-preview').src = url;
             document.getElementById('image-preview-container').style.display = 'inline-block';
             document.getElementById('upload-zone').style.display = 'none';
