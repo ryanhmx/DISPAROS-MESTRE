@@ -4,7 +4,8 @@ const { v4: uuidv4 } = require('uuid');
 const { db } = require('./db');
 const { sendCampaignToChannel } = require('./bot');
 
-const activeCronJobs = {}; // jobId -> cron task
+const activeCronJobs = {};   // jobId -> cron task
+const cancelledJobs = new Set(); // jobIds requested to cancel mid-run
 
 async function dispatchJob(jobId) {
   const job = await db.getAsync('SELECT * FROM scheduled_jobs WHERE id = ?', [jobId]);
@@ -37,7 +38,14 @@ async function dispatchJob(jobId) {
   }
 
   let allOk = true;
+  let cancelled = false;
   for (const ch of channels) {
+    // Check if a cancellation was requested
+    if (cancelledJobs.has(jobId)) {
+      cancelledJobs.delete(jobId);
+      cancelled = true;
+      break;
+    }
     await new Promise(resolve => setTimeout(resolve, 50)); // 50ms delay per channel
     const logId = uuidv4();
     try {
@@ -53,6 +61,13 @@ async function dispatchJob(jobId) {
         VALUES (?, ?, ?, ?, ?, 'failed', ?)
       `, [logId, jobId, campaign.id, ch.id, ch.name, err.message]);
     }
+  }
+
+  // If cancelled mid-run, mark as cancelled and return early
+  if (cancelled) {
+    await db.runAsync("UPDATE scheduled_jobs SET status = 'cancelled' WHERE id = ?", [jobId]);
+    await db.runAsync("UPDATE campaigns SET status = 'cancelled', updated_at = datetime('now') WHERE id = ?", [campaign.id]);
+    return;
   }
 
   if (!allOk) {
@@ -119,7 +134,14 @@ async function cancelJob(jobId) {
     activeCronJobs[jobId].stop();
     delete activeCronJobs[jobId];
   }
+  // Signal cancellation for jobs currently running mid-loop
+  cancelledJobs.add(jobId);
   await db.runAsync("UPDATE scheduled_jobs SET status = 'cancelled' WHERE id = ?", [jobId]);
+}
+
+// Request cancellation of a running dispatch (mid-loop)
+function requestCancel(jobId) {
+  cancelledJobs.add(jobId);
 }
 
 async function restorePendingJobs() {
@@ -142,4 +164,4 @@ async function restorePendingJobs() {
   }
 }
 
-module.exports = { scheduleJob, cancelJob, restorePendingJobs, dispatchJob };
+module.exports = { scheduleJob, cancelJob, restorePendingJobs, dispatchJob, requestCancel };

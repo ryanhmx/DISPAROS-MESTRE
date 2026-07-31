@@ -268,6 +268,7 @@
         ]);
         renderCampaigns();
         renderChannels();
+        scheduleAutoRefresh();
       } catch (e) { toast('Erro ao carregar dados', 'error'); }
     }
 
@@ -301,7 +302,10 @@
               <button class="btn btn-sm btn-danger" onclick="deleteMessages('${c.id}')" title="Apagar mensagens enviadas do Telegram">🧹 Apagar</button>
               <button class="btn btn-sm btn-danger" onclick="deleteCampaign('${c.id}')" title="Excluir Campanha">🗑️</button>
               <div style="flex: 1;"></div>
-              <button class="btn btn-success" onclick="openPreviewModal('${c.id}')" title="Ver Prévia e Disparar" style="padding: 8px 20px; font-weight: bold;">🚀 Enviar Campanha</button>
+              ${c.status === 'running'
+                ? `<button class="btn btn-danger" onclick="cancelCampaign('${c.id}')" style="padding: 8px 20px; font-weight: bold;">🛑 Cancelar Disparo</button>`
+                : `<button class="btn btn-success" onclick="openPreviewModal('${c.id}')" title="Ver Prévia e Disparar" style="padding: 8px 20px; font-weight: bold;">🚀 Enviar Campanha</button>`
+              }
             </td>
           </tr>
         `).join('');
@@ -640,6 +644,30 @@
         } catch (e) { toast(e.message, 'error'); }
       });
     }
+
+    async function cancelCampaign(id) {
+      showConfirm('Cancelar Disparo', 'Tem certeza que deseja parar o disparo em andamento? As mensagens já enviadas não serão desfeitas.', async () => {
+        try {
+          await apiPost(`/campaigns/${id}/cancel`);
+          toast('Disparo cancelado! As mensagens já enviadas foram mantidas.', 'warning');
+          loadData();
+        } catch (e) { toast(e.message, 'error'); }
+      });
+    }
+
+    // Auto-refresh while any campaign is running
+    let _autoRefreshTimer = null;
+    function scheduleAutoRefresh() {
+      clearTimeout(_autoRefreshTimer);
+      const hasRunning = campaigns.some(c => c.status === 'running');
+      if (hasRunning) {
+        _autoRefreshTimer = setTimeout(async () => {
+          await loadData();
+          scheduleAutoRefresh();
+        }, 3000); // refresh every 3s while running
+      }
+    }
+
 
     async function deleteMessages(id) {
       showConfirm('Apagar Mensagens', 'Tem certeza? Isso vai APAGAR as mensagens desta campanha de todos os canais onde ela foi enviada.', async () => {

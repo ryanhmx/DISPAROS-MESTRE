@@ -4,7 +4,7 @@ const { v4: uuidv4 } = require('uuid');
 const path = require('path');
 const fs = require('fs');
 const { db } = require('../db');
-const { scheduleJob, cancelJob, dispatchJob } = require('../scheduler');
+const { scheduleJob, cancelJob, dispatchJob, requestCancel } = require('../scheduler');
 
 const UPLOADS_DIR = path.join(__dirname, '..', 'data', 'uploads');
 if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
@@ -271,6 +271,40 @@ router.delete('/:id/messages', async (req, res) => {
     await db.runAsync("UPDATE campaigns SET status = 'deleted', updated_at = datetime('now') WHERE id = ?", [req.params.id]);
 
     res.json({ ok: true, deletedCount });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/campaigns/:id/cancel — cancel a running or pending dispatch
+router.post('/:id/cancel', async (req, res) => {
+  try {
+    const campaign = await db.getAsync('SELECT * FROM campaigns WHERE id = ?', [req.params.id]);
+    if (!campaign) return res.status(404).json({ error: 'Campanha não encontrada' });
+
+    // Get all running/pending jobs for this campaign
+    const jobs = await db.allAsync(
+      "SELECT * FROM scheduled_jobs WHERE campaign_id = ? AND status IN ('running', 'pending')",
+      [req.params.id]
+    );
+
+    for (const job of jobs) {
+      if (job.status === 'running') {
+        // Signal mid-loop cancellation
+        requestCancel(job.id);
+      } else {
+        // Cancel scheduled/pending jobs
+        await cancelJob(job.id);
+      }
+    }
+
+    // Update campaign status immediately so UI reflects it
+    await db.runAsync(
+      "UPDATE campaigns SET status = 'cancelled', updated_at = datetime('now') WHERE id = ?",
+      [req.params.id]
+    );
+
+    res.json({ ok: true, cancelled: jobs.length });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
