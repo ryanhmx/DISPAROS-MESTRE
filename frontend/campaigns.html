@@ -491,7 +491,11 @@
       const previewImg = document.getElementById('image-preview-container');
       const hasImage = previewImg.style.display === 'inline-block';
       const limit = hasImage ? 1024 : 4096;
-      const count = text.length;
+
+      // Telegram doesn't count HTML formatting tags toward the character limit
+      // Strip all HTML tags to get the actual character count as Telegram sees it
+      const textWithoutTags = text.replace(/<[^>]*>/g, '');
+      const count = textWithoutTags.length;
       
       const counter = document.getElementById('char-counter');
       counter.textContent = `${count} / ${limit} caracteres`;
