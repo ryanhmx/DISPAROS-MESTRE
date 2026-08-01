@@ -145,10 +145,18 @@ function requestCancel(jobId) {
 }
 
 async function restorePendingJobs() {
+  // Reset any jobs that were 'running' when the server shut down — they were interrupted
+  const stuckJobs = await db.allAsync("SELECT * FROM scheduled_jobs WHERE status = 'running'");
+  for (const job of stuckJobs) {
+    console.log(`Resetting stuck running job ${job.id} to failed (server was restarted)`);
+    await db.runAsync("UPDATE scheduled_jobs SET status = 'failed' WHERE id = ?", [job.id]);
+    await db.runAsync("UPDATE campaigns SET status = 'failed', updated_at = datetime('now') WHERE id = ? AND status = 'running'", [job.campaign_id]);
+  }
+
   const jobs = await db.allAsync(
-    "SELECT * FROM scheduled_jobs WHERE status IN ('pending', 'running')"
+    "SELECT * FROM scheduled_jobs WHERE status = 'pending'"
   );
-  console.log(`Restoring ${jobs.length} pending/running jobs...`);
+  console.log(`Restoring ${jobs.length} pending jobs...`);
   for (const job of jobs) {
     if (job.schedule_type === 'recurring') {
       await scheduleJob(job.id);
