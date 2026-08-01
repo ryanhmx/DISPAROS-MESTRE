@@ -89,6 +89,7 @@ async function sendCampaignToChannel(chatId, campaign, attempt = 1) {
     if (campaign.image_path && fs.existsSync(campaign.image_path)) {
       return await bot.sendPhoto(chatId, fs.createReadStream(campaign.image_path), {
         caption: campaign.message_text || '',
+        parse_mode: campaign.parse_mode || 'HTML',
         ...opts
       });
     }
