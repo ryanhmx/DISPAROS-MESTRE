@@ -110,10 +110,15 @@ async function deleteMessageFromChannel(chatId, messageId) {
   const bot = await getBot();
   if (!bot) throw new Error('Bot não configurado');
   try {
-    return await bot.deleteMessage(chatId, messageId);
+    await bot.deleteMessage(chatId, messageId);
+    return { ok: true };
   } catch (e) {
-    console.error('Failed to delete message:', e.message);
-    return false;
+    const msg = e.message || '';
+    if (msg.includes('message to delete not found')) {
+      return { ok: true, alreadyDeleted: true };
+    }
+    console.error(`Failed to delete message ${messageId} in chat ${chatId}:`, msg);
+    return { ok: false, error: msg };
   }
 }
 

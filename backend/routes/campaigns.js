@@ -249,14 +249,14 @@ router.delete('/:id/messages', async (req, res) => {
   try {
     const { deleteMessageFromChannel } = require('../bot');
     
-    // Get all successful sends for this campaign
+    // Get all send logs for this campaign that have a telegram message ID
+    // Check all logs regardless of status in case previous deletion attempts failed or incorrectly set status
     const logs = await db.allAsync(
-      "SELECT * FROM send_log WHERE campaign_id = ? AND status = 'success' AND telegram_msg_id IS NOT NULL",
+      "SELECT * FROM send_log WHERE campaign_id = ? AND telegram_msg_id IS NOT NULL AND telegram_msg_id != ''",
       [req.params.id]
     );
 
     if (logs.length === 0) {
-      // No messages to delete — still mark as deleted
       await db.runAsync("UPDATE campaigns SET status = 'deleted', updated_at = datetime('now') WHERE id = ?", [req.params.id]);
       return res.json({ ok: true, deletedCount: 0, failedCount: 0 });
     }
@@ -268,23 +268,27 @@ router.delete('/:id/messages', async (req, res) => {
     for (const log of logs) {
       const channel = await db.getAsync('SELECT chat_id, name FROM channels WHERE id = ?', [log.channel_id]);
       if (channel && channel.chat_id) {
-        const success = await deleteMessageFromChannel(channel.chat_id, log.telegram_msg_id);
-        if (success === true) {
+        const result = await deleteMessageFromChannel(channel.chat_id, log.telegram_msg_id);
+        if (result.ok) {
           deletedCount++;
           await db.runAsync("UPDATE send_log SET status = 'deleted' WHERE id = ?", [log.id]);
         } else {
           failedCount++;
           errors.push(channel.name || channel.chat_id);
+          await db.runAsync("UPDATE send_log SET status = 'failed_delete', error_msg = ? WHERE id = ?", [result.error || 'Falha ao deletar', log.id]);
         }
       }
     }
     
-    // Only mark campaign as deleted if at least one message was deleted
-    if (deletedCount > 0) {
+    // Only mark campaign as deleted if ALL messages were successfully deleted (or no failures occurred)
+    if (failedCount === 0 && deletedCount > 0) {
       await db.runAsync("UPDATE campaigns SET status = 'deleted', updated_at = datetime('now') WHERE id = ?", [req.params.id]);
+    } else if (failedCount > 0) {
+      // If some/all failed, revert campaign status to 'sent' so user can see it didn't finish deleting and retry after fixing permissions
+      await db.runAsync("UPDATE campaigns SET status = 'sent', updated_at = datetime('now') WHERE id = ?", [req.params.id]);
     }
 
-    res.json({ ok: true, deletedCount, failedCount, failedChannels: errors });
+    res.json({ ok: failedCount === 0, deletedCount, failedCount, failedChannels: errors });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
