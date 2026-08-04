@@ -183,6 +183,7 @@ function statusBadge(status) {
     draft:     ['badge-muted',   '📝 Rascunho'],
     scheduled: ['badge-warning', '⏰ Agendado'],
     sent:      ['badge-success', '📤 Enviado'],
+    deleted:   ['badge-danger',  '🗑️ Apagado'],
   };
   const [cls, label] = map[status] || ['badge-muted', status];
   return `<span class="badge ${cls}">${label}</span>`;
