@@ -255,22 +255,36 @@ router.delete('/:id/messages', async (req, res) => {
       [req.params.id]
     );
 
+    if (logs.length === 0) {
+      // No messages to delete — still mark as deleted
+      await db.runAsync("UPDATE campaigns SET status = 'deleted', updated_at = datetime('now') WHERE id = ?", [req.params.id]);
+      return res.json({ ok: true, deletedCount: 0, failedCount: 0 });
+    }
+
     let deletedCount = 0;
+    let failedCount = 0;
+    const errors = [];
+
     for (const log of logs) {
-      // Get the chat_id from the channel
-      const channel = await db.getAsync('SELECT chat_id FROM channels WHERE id = ?', [log.channel_id]);
+      const channel = await db.getAsync('SELECT chat_id, name FROM channels WHERE id = ?', [log.channel_id]);
       if (channel && channel.chat_id) {
         const success = await deleteMessageFromChannel(channel.chat_id, log.telegram_msg_id);
-        if (success !== false) {
+        if (success === true) {
           deletedCount++;
           await db.runAsync("UPDATE send_log SET status = 'deleted' WHERE id = ?", [log.id]);
+        } else {
+          failedCount++;
+          errors.push(channel.name || channel.chat_id);
         }
       }
     }
     
-    await db.runAsync("UPDATE campaigns SET status = 'deleted', updated_at = datetime('now') WHERE id = ?", [req.params.id]);
+    // Only mark campaign as deleted if at least one message was deleted
+    if (deletedCount > 0) {
+      await db.runAsync("UPDATE campaigns SET status = 'deleted', updated_at = datetime('now') WHERE id = ?", [req.params.id]);
+    }
 
-    res.json({ ok: true, deletedCount });
+    res.json({ ok: true, deletedCount, failedCount, failedChannels: errors });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
