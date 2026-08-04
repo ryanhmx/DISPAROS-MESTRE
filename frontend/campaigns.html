@@ -674,7 +674,7 @@
 
 
     async function deleteMessages(id) {
-      showConfirm('Apagar Mensagens', 'Tem certeza? Isso vai APAGAR as mensagens desta campanha de todos os canais onde ela foi enviada.\n\n⚠️ O bot precisa ser Admin do canal para poder apagar mensagens.', async () => {
+      showConfirm('Apagar Mensagens', 'Tem certeza? Isso vai APAGAR as mensagens desta campanha de todos os canais onde ela foi enviada.', async () => {
         try {
           toast('Apagando mensagens dos canais...', 'info');
           const res = await apiDelete(`/campaigns/${id}/messages`);
@@ -682,11 +682,12 @@
           if (res.deletedCount > 0 && res.failedCount === 0) {
             toast(`✅ ${res.deletedCount} mensagem(ns) apagada(s) com sucesso!`);
           } else if (res.deletedCount > 0 && res.failedCount > 0) {
-            toast(`⚠️ ${res.deletedCount} apagada(s), ${res.failedCount} falha(s). O bot pode não ser admin em alguns canais.`, 'warning');
-          } else if (res.deletedCount === 0 && res.failedCount > 0) {
-            toast(`❌ Nenhuma mensagem foi apagada. Verifique se o bot é Admin nos canais: ${res.failedChannels?.join(', ')}`, 'error');
+            toast(`⚠️ ${res.deletedCount} apagada(s), ${res.failedCount} falha(s).\n${res.failedChannels?.join('\n')}`, 'warning');
+          } else if (res.failedCount > 0) {
+            const errDetail = res.message || res.failedChannels?.join('\n') || 'Erro desconhecido';
+            toast(`❌ Falha ao apagar mensagens:\n${errDetail}`, 'error');
           } else {
-            toast('Nenhuma mensagem para apagar.');
+            toast(res.message || 'Nenhuma mensagem para apagar.');
           }
           loadData();
         } catch (e) { toast(e.message, 'error'); }

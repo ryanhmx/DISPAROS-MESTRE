@@ -250,15 +250,24 @@ router.delete('/:id/messages', async (req, res) => {
     const { deleteMessageFromChannel } = require('../bot');
     
     // Get all send logs for this campaign that have a telegram message ID
-    // Check all logs regardless of status in case previous deletion attempts failed or incorrectly set status
     const logs = await db.allAsync(
       "SELECT * FROM send_log WHERE campaign_id = ? AND telegram_msg_id IS NOT NULL AND telegram_msg_id != ''",
       [req.params.id]
     );
 
     if (logs.length === 0) {
+      // Check if there were any logs at all for this campaign (sent without saving message ID)
+      const anyLogs = await db.allAsync("SELECT * FROM send_log WHERE campaign_id = ?", [req.params.id]);
+      if (anyLogs.length > 0) {
+        return res.json({ 
+          ok: false, 
+          deletedCount: 0, 
+          failedCount: anyLogs.length, 
+          message: 'Esta campanha foi enviada numa versão antiga do sistema que não salvava os IDs das mensagens. O Telegram não permite apagar mensagens sem o ID.' 
+        });
+      }
       await db.runAsync("UPDATE campaigns SET status = 'deleted', updated_at = datetime('now') WHERE id = ?", [req.params.id]);
-      return res.json({ ok: true, deletedCount: 0, failedCount: 0 });
+      return res.json({ ok: true, deletedCount: 0, failedCount: 0, message: 'Nenhuma mensagem registrada para apagar.' });
     }
 
     let deletedCount = 0;
@@ -274,7 +283,8 @@ router.delete('/:id/messages', async (req, res) => {
           await db.runAsync("UPDATE send_log SET status = 'deleted' WHERE id = ?", [log.id]);
         } else {
           failedCount++;
-          errors.push(channel.name || channel.chat_id);
+          const channelName = channel.name || channel.chat_id;
+          errors.push(`${channelName} → ${result.error || 'Erro ao apagar'}`);
           await db.runAsync("UPDATE send_log SET status = 'failed_delete', error_msg = ? WHERE id = ?", [result.error || 'Falha ao deletar', log.id]);
         }
       }
