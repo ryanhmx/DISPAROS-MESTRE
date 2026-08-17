@@ -103,12 +103,33 @@
                 <button type="button" class="btn btn-ghost btn-sm" onclick="insertLink()" title="Link" style="min-width:32px;">🔗</button>
                 <button type="button" class="btn btn-ghost btn-sm" onclick="wrapTag('blockquote')" title="Citação / Bloco de Citação" style="min-width:32px;">❝</button>
                 <button type="button" class="btn btn-ghost btn-sm" onclick="wrapTag('tg-spoiler')" title="Spoiler" style="min-width:32px;">👁️</button>
+                <div style="width:1px; background:var(--border); margin: 2px 4px;"></div>
+                <button type="button" class="btn btn-ghost btn-sm" onclick="toggleEmojiPicker()" title="Inserir Emoji" style="min-width:32px; font-size:16px;">😀</button>
+                <button type="button" class="btn btn-ghost btn-sm" onclick="toggleCustomEmojiPanel()" title="Emoji Animado Personalizado (Telegram Premium)" style="min-width:32px; font-size:14px;">✨</button>
               </div>
+
+              <!-- Emoji Picker -->
+              <div id="emoji-picker" style="display:none; padding:10px; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-sm); margin-bottom:8px; max-height:200px; overflow-y:auto;">
+                <div style="display:flex; flex-wrap:wrap; gap:4px;">
+                </div>
+              </div>
+
+              <!-- Custom Emoji Panel -->
+              <div id="custom-emoji-panel" style="display:none; padding:12px; background:var(--bg-card); border:1px solid var(--accent); border-radius:var(--radius-sm); margin-bottom:8px;">
+                <p style="margin:0 0 8px; font-size:0.85rem; color:var(--text-muted);">✨ <strong>Emojis Animados Personalizados</strong> — Use a tag <code>&lt;tg-emoji emoji-id="ID"&gt;🔥&lt;/tg-emoji&gt;</code></p>
+                <div style="display:flex; gap:8px; margin-bottom:8px;">
+                  <input id="tg-emoji-id" class="form-control" placeholder="ID do emoji (ex: 5368324170671202286)" style="flex:1; font-size:0.85rem;">
+                  <input id="tg-emoji-fallback" class="form-control" placeholder="Emoji base (ex: 🔥)" style="width:80px; font-size:0.85rem;">
+                  <button type="button" class="btn btn-primary btn-sm" onclick="insertCustomEmoji()" style="white-space:nowrap;">Inserir</button>
+                </div>
+                <p style="margin:0; font-size:0.78rem; color:var(--text-muted);">💡 Para pegar o ID: encaminhe o emoji animado para o bot <a href="https://t.me/getidsbot" target="_blank" style="color:var(--accent);">@getidsbot</a> e copie o <code>file_id</code>. O emoji base aparece quando o cliente não tem Telegram Premium.</p>
+              </div>
+
               <textarea id="c-text" class="form-control" style="border-radius: 0 0 var(--radius-sm) var(--radius-sm);" placeholder="Digite a mensagem aqui..." oninput="updateCharCount()"></textarea>
               <div id="char-counter" style="text-align: right; font-size: 0.8rem; margin-top: 4px; color: var(--text-muted);">0 / 4096 caracteres</div>
               <div class="form-hint" style="margin-top:6px;">
                 Use os botões acima para formatar. <b>B</b> = negrito, <i>I</i> = itálico, <u>U</u> = sublinhado, <s>S</s> = riscado, ❝ = citação em bloco.
-                <br>Emojis normais (Unicode) funcionam ✅. Emojis animados do Telegram Premium podem não ser reproduzidos pelo bot.
+                <br>😀 = inserir emoji | ✨ = emoji animado personalizado do Telegram.
               </div>
             </div>
 
@@ -501,6 +522,77 @@
       ta.value = text.substring(0, start) + link + text.substring(end);
       ta.focus();
       updateCharCount();
+    }
+
+    // ── Emoji Picker ──────────────────────────────────────────────────────
+    const EMOJI_LIST = [
+      '😀','😃','😄','😁','😆','😅','🤣','😂','🙂','😊','😇','🥰','😍','🤩','😘','😗','😋','😛','😜','🤪',
+      '🤔','🤨','😐','😑','😶','🙄','😏','😒','🙃','😞','😟','😣','😖','😢','😭','😤','😠','😡','🤬','🥱',
+      '😴','🥳','🤯','🤠','🥸','😎','🤓','🧐','😳','🫡','🤫','🤭','😬','😱','😨','😰','😥','🙁','☹️','😧',
+      '🔥','⚡','💫','✨','🌟','💥','❤️','🧡','💛','💚','💙','💜','🖤','🤍','🤎','❤️‍🔥','💔','❣️','💕','💞',
+      '🎉','🎊','🎁','🎀','🏆','🥇','🎯','🚀','💡','📢','📣','🔔','🔕','💰','💵','💳','🤑','👑','💎','🔑',
+      '👍','👎','👏','🙌','🤝','🫶','💪','✌️','🤞','👆','👇','👉','👈','☝️','🤙','💁','🙋','🤦','🤷',
+      '✅','❌','⭕','❗','❓','‼️','⚠️','🔴','🟠','🟡','🟢','🔵','🟣','⚫','⚪','🟤','🔶','🔷','🔸','🔹',
+      '📱','💻','🖥️','⌨️','🖱️','📷','📸','🎥','📹','📞','☎️','📟','📠','🔊','🔉','🔈','🔇','🔋','🔌','💾',
+      '🌍','🌎','🌏','🗺️','🏔️','⛰️','🌋','🗻','🏕️','🏖️','🏜️','🏝️','🏞️','🏗️','🌅','🌄','🌠','🎇','🎆','🌇',
+      '🍕','🍔','🌮','🌯','🥙','🥗','🍜','🍣','🍱','🍦','🍰','🎂','🍫','🍬','🍭','☕','🍵','🧃','🥤','🍺',
+    ];
+
+    function toggleEmojiPicker() {
+      const picker = document.getElementById('emoji-picker');
+      const panel = document.getElementById('custom-emoji-panel');
+      if (panel.style.display !== 'none') panel.style.display = 'none';
+      if (picker.style.display === 'none') {
+        // Build emoji grid if empty
+        const grid = picker.querySelector('div');
+        if (grid.children.length === 0) {
+          EMOJI_LIST.forEach(emoji => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.textContent = emoji;
+            btn.style.cssText = 'background:none;border:none;cursor:pointer;font-size:22px;padding:2px;border-radius:4px;line-height:1;';
+            btn.onmouseover = () => btn.style.background = 'var(--bg-input)';
+            btn.onmouseout = () => btn.style.background = 'none';
+            btn.onclick = () => insertEmoji(emoji);
+            grid.appendChild(btn);
+          });
+        }
+        picker.style.display = 'block';
+      } else {
+        picker.style.display = 'none';
+      }
+    }
+
+    function toggleCustomEmojiPanel() {
+      const panel = document.getElementById('custom-emoji-panel');
+      const picker = document.getElementById('emoji-picker');
+      if (picker.style.display !== 'none') picker.style.display = 'none';
+      panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+    }
+
+    function insertEmoji(emoji) {
+      const ta = document.getElementById('c-text');
+      const start = ta.selectionStart;
+      const text = ta.value;
+      ta.value = text.substring(0, start) + emoji + text.substring(ta.selectionEnd);
+      ta.selectionStart = ta.selectionEnd = start + emoji.length;
+      ta.focus();
+      updateCharCount();
+    }
+
+    function insertCustomEmoji() {
+      const emojiId = document.getElementById('tg-emoji-id').value.trim();
+      const fallback = document.getElementById('tg-emoji-fallback').value.trim() || '⭐';
+      if (!emojiId) { toast('Cole o ID do emoji personalizado!', 'error'); return; }
+      const tag = `<tg-emoji emoji-id="${emojiId}">${fallback}</tg-emoji>`;
+      const ta = document.getElementById('c-text');
+      const start = ta.selectionStart;
+      ta.value = ta.value.substring(0, start) + tag + ta.value.substring(ta.selectionEnd);
+      ta.selectionStart = ta.selectionEnd = start + tag.length;
+      ta.focus();
+      updateCharCount();
+      document.getElementById('tg-emoji-id').value = '';
+      document.getElementById('tg-emoji-fallback').value = '';
     }
 
     function updateCharCount() {
