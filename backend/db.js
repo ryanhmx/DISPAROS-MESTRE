@@ -56,16 +56,19 @@ function initSchema() {
         created_at TEXT DEFAULT (datetime('now'))
       )`);
       db.run(`CREATE TABLE IF NOT EXISTS campaigns (
-        id           TEXT PRIMARY KEY,
-        name         TEXT NOT NULL,
-        message_text TEXT,
-        image_path   TEXT,
-        buttons      TEXT,
-        parse_mode   TEXT DEFAULT 'HTML',
-        status       TEXT DEFAULT 'draft',
-        created_at   TEXT DEFAULT (datetime('now')),
-        updated_at   TEXT DEFAULT (datetime('now'))
+        id                TEXT PRIMARY KEY,
+        name              TEXT NOT NULL,
+        message_text      TEXT,
+        image_path        TEXT,
+        buttons           TEXT,
+        parse_mode        TEXT DEFAULT 'HTML',
+        status            TEXT DEFAULT 'draft',
+        auto_delete_hours INTEGER DEFAULT NULL,
+        created_at        TEXT DEFAULT (datetime('now')),
+        updated_at        TEXT DEFAULT (datetime('now'))
       )`);
+      // Migration: add auto_delete_hours to existing databases
+      db.run(`ALTER TABLE campaigns ADD COLUMN auto_delete_hours INTEGER DEFAULT NULL`, [], () => {});
       db.run(`CREATE TABLE IF NOT EXISTS campaign_channels (
         campaign_id TEXT REFERENCES campaigns(id) ON DELETE CASCADE,
         channel_id  TEXT REFERENCES channels(id) ON DELETE CASCADE,

@@ -172,4 +172,54 @@ async function restorePendingJobs() {
   }
 }
 
-module.exports = { scheduleJob, cancelJob, restorePendingJobs, dispatchJob, requestCancel };
+// Auto-delete cron: runs every 30 minutes, deletes messages for campaigns with auto_delete_hours set
+async function runAutoDelete() {
+  try {
+    const { deleteMessageFromChannel } = require('./bot');
+
+    // Find sent campaigns that have auto_delete_hours set and whose messages are old enough
+    const campaigns = await db.allAsync(`
+      SELECT c.* FROM campaigns c
+      WHERE c.auto_delete_hours IS NOT NULL
+        AND c.status = 'sent'
+        AND datetime(c.updated_at, '+' || c.auto_delete_hours || ' hours') <= datetime('now')
+    `);
+
+    for (const campaign of campaigns) {
+      console.log(`Auto-deleting messages for campaign: ${campaign.name}`);
+      const logs = await db.allAsync(
+        "SELECT * FROM send_log WHERE campaign_id = ? AND telegram_msg_id IS NOT NULL AND telegram_msg_id != '' AND status = 'success'",
+        [campaign.id]
+      );
+
+      let deletedCount = 0;
+      for (const log of logs) {
+        const channel = await db.getAsync('SELECT chat_id FROM channels WHERE id = ?', [log.channel_id]);
+        if (channel && channel.chat_id) {
+          const result = await deleteMessageFromChannel(channel.chat_id, log.telegram_msg_id);
+          if (result.ok) {
+            deletedCount++;
+            await db.runAsync("UPDATE send_log SET status = 'deleted' WHERE id = ?", [log.id]);
+          }
+        }
+      }
+
+      // Mark campaign as deleted
+      await db.runAsync(
+        "UPDATE campaigns SET status = 'deleted', updated_at = datetime('now') WHERE id = ?",
+        [campaign.id]
+      );
+      console.log(`Auto-deleted ${deletedCount} messages for campaign: ${campaign.name}`);
+    }
+  } catch (e) {
+    console.error('Auto-delete cron error:', e.message);
+  }
+}
+
+function startAutoDeleteCron() {
+  // Run every 30 minutes
+  cron.schedule('*/30 * * * *', () => runAutoDelete());
+  console.log('Auto-delete cron started (runs every 30 minutes)');
+}
+
+module.exports = { scheduleJob, cancelJob, restorePendingJobs, dispatchJob, requestCancel, startAutoDeleteCron };

@@ -133,6 +133,20 @@
             </div>
 
             <div class="divider"></div>
+            <div class="form-group">
+              <label class="form-label">🗑️ Auto-apagar mensagens após envio</label>
+              <select id="c-auto-delete" class="form-control" style="max-width: 280px;">
+                <option value="">Não apagar automaticamente</option>
+                <option value="24">1 dia (24h)</option>
+                <option value="48">2 dias (48h)</option>
+                <option value="72">3 dias (72h)</option>
+                <option value="168">1 semana (7 dias)</option>
+                <option value="336">2 semanas (14 dias)</option>
+              </select>
+              <small style="color: var(--text-muted); display: block; margin-top: 4px;">O bot apagará automaticamente as mensagens enviadas após o tempo selecionado.</small>
+            </div>
+
+            <div class="divider"></div>
             <div class="flex" style="gap: 10px; justify-content: flex-end">
                 <button type="button" class="btn btn-secondary" onclick="showList()">Cancelar</button>
                 <button type="button" class="btn btn-secondary" onclick="testDriveCampaign()" style="background:var(--accent-glow); color:var(--accent); border-color:var(--accent);">🧪 Testar Envio</button>
@@ -365,6 +379,7 @@
         document.getElementById('c-id').value = '';
         document.getElementById('c-name').value = '';
         document.getElementById('c-text').value = '';
+        document.getElementById('c-auto-delete').value = '';
         removeImage();
       } else {
         document.getElementById('editor-title').textContent = 'Editar Campanha';
@@ -403,6 +418,8 @@
               const el = document.querySelector(`.channel-item[data-id="${ch.id}"]`);
               if (el) el.classList.add('selected');
             });
+          // Load auto-delete setting
+          document.getElementById('c-auto-delete').value = c.auto_delete_hours || '';
           }
         } catch (e) { toast(e.message, 'error'); }
       }
@@ -615,6 +632,9 @@
       const checked = [];
       document.querySelectorAll('.channel-item.selected').forEach(el => checked.push(el.dataset.id));
       formData.append('channel_ids', JSON.stringify(checked));
+
+      const autoDelete = document.getElementById('c-auto-delete').value;
+      formData.append('auto_delete_hours', autoDelete);
 
       const url = id ? `/api/campaigns/${id}` : '/api/campaigns';
       

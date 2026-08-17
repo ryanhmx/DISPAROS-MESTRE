@@ -3,7 +3,7 @@ const cors = require('cors');
 const fileUpload = require('express-fileupload');
 const path = require('path');
 const { initSchema } = require('./db');
-const { restorePendingJobs } = require('./scheduler');
+const { restorePendingJobs, startAutoDeleteCron } = require('./scheduler');
 
 const app = express();
 const PORT = process.env.PORT || 3131;
@@ -50,6 +50,7 @@ async function main() {
   console.log('✅ Database initialized');
 
   await restorePendingJobs();
+  startAutoDeleteCron();
   console.log('✅ Pending jobs restored');
 
   app.listen(PORT, () => {

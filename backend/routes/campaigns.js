@@ -59,7 +59,7 @@ router.get('/:id', async (req, res) => {
 // POST /api/campaigns
 router.post('/', async (req, res) => {
   try {
-    const { name, message_text, buttons, parse_mode, channel_ids } = req.body;
+    const { name, message_text, buttons, parse_mode, channel_ids, auto_delete_hours } = req.body;
     if (!name) return res.status(400).json({ error: 'Nome é obrigatório' });
 
     let image_path = null;
@@ -71,10 +71,11 @@ router.post('/', async (req, res) => {
     }
 
     const id = uuidv4();
+    const autoDeleteVal = auto_delete_hours ? parseInt(auto_delete_hours) : null;
     await db.runAsync(
-      `INSERT INTO campaigns (id, name, message_text, image_path, buttons, parse_mode)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [id, name, message_text || '', image_path, buttons || null, parse_mode || 'HTML']
+      `INSERT INTO campaigns (id, name, message_text, image_path, buttons, parse_mode, auto_delete_hours)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [id, name, message_text || '', image_path, buttons || null, parse_mode || 'HTML', autoDeleteVal]
     );
 
     // Link channels
@@ -135,7 +136,7 @@ router.post('/test', async (req, res) => {
 // PUT /api/campaigns/:id
 router.put('/:id', async (req, res) => {
   try {
-    const { name, message_text, buttons, parse_mode, channel_ids, remove_image } = req.body;
+    const { name, message_text, buttons, parse_mode, channel_ids, remove_image, auto_delete_hours } = req.body;
 
     let image_path_update = null;
     if (req.files && req.files.image) {
@@ -158,10 +159,14 @@ router.put('/:id', async (req, res) => {
       }
     }
 
+    const autoDeleteVal = auto_delete_hours !== undefined
+      ? (auto_delete_hours === '' || auto_delete_hours === null ? null : parseInt(auto_delete_hours))
+      : existing.auto_delete_hours;
+
     await db.runAsync(
-      `UPDATE campaigns SET name=?, message_text=?, image_path=?, buttons=?, parse_mode=?, updated_at=datetime('now')
+      `UPDATE campaigns SET name=?, message_text=?, image_path=?, buttons=?, parse_mode=?, auto_delete_hours=?, updated_at=datetime('now')
        WHERE id=?`,
-      [name || existing.name, message_text !== undefined ? message_text : existing.message_text, finalImagePath, buttons !== undefined ? buttons : existing.buttons, parse_mode || existing.parse_mode, req.params.id]
+      [name || existing.name, message_text !== undefined ? message_text : existing.message_text, finalImagePath, buttons !== undefined ? buttons : existing.buttons, parse_mode || existing.parse_mode, autoDeleteVal, req.params.id]
     );
 
     if (channel_ids !== undefined) {
