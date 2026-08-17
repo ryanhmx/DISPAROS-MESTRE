@@ -115,14 +115,31 @@
               </div>
 
               <!-- Custom Emoji Panel -->
+              <!-- Custom Emoji Panel — Pack Browser -->
               <div id="custom-emoji-panel" style="display:none; padding:12px; background:var(--bg-card); border:1px solid var(--accent); border-radius:var(--radius-sm); margin-bottom:8px;">
-                <p style="margin:0 0 8px; font-size:0.85rem; color:var(--text-muted);">✨ <strong>Emojis Animados Personalizados</strong> — Use a tag <code>&lt;tg-emoji emoji-id="ID"&gt;🔥&lt;/tg-emoji&gt;</code></p>
-                <div style="display:flex; gap:8px; margin-bottom:8px;">
-                  <input id="tg-emoji-id" class="form-control" placeholder="ID do emoji (ex: 5368324170671202286)" style="flex:1; font-size:0.85rem;">
-                  <input id="tg-emoji-fallback" class="form-control" placeholder="Emoji base (ex: 🔥)" style="width:80px; font-size:0.85rem;">
-                  <button type="button" class="btn btn-primary btn-sm" onclick="insertCustomEmoji()" style="white-space:nowrap;">Inserir</button>
+                <p style="margin:0 0 10px; font-size:0.85rem;"><strong>✨ Emojis Animados Personalizados</strong></p>
+
+                <!-- Popular packs quick-access -->
+                <div style="margin-bottom:10px;">
+                  <span style="font-size:0.78rem; color:var(--text-muted); margin-right:6px;">Packs populares:</span>
+                  <button type="button" class="btn btn-ghost btn-sm" onclick="loadEmojiPack('HotAnimated')" style="font-size:0.78rem; padding:2px 8px; margin:2px;">🔥 HotAnimated</button>
+                  <button type="button" class="btn btn-ghost btn-sm" onclick="loadEmojiPack('EmojiAnimated')" style="font-size:0.78rem; padding:2px 8px; margin:2px;">😎 EmojiAnimated</button>
+                  <button type="button" class="btn btn-ghost btn-sm" onclick="loadEmojiPack('Usersemoji')" style="font-size:0.78rem; padding:2px 8px; margin:2px;">🎯 Usersemoji</button>
+                  <button type="button" class="btn btn-ghost btn-sm" onclick="loadEmojiPack('GreatEmojis')" style="font-size:0.78rem; padding:2px 8px; margin:2px;">⭐ GreatEmojis</button>
                 </div>
-                <p style="margin:0; font-size:0.78rem; color:var(--text-muted);">💡 Para pegar o ID: encaminhe o emoji animado para o bot <a href="https://t.me/getidsbot" target="_blank" style="color:var(--accent);">@getidsbot</a> e copie o <code>file_id</code>. O emoji base aparece quando o cliente não tem Telegram Premium.</p>
+
+                <!-- Search by pack name -->
+                <div style="display:flex; gap:8px; margin-bottom:10px;">
+                  <input id="emoji-pack-name" class="form-control" placeholder="Nome do pack (ex: HotAnimated)" style="flex:1; font-size:0.85rem;" onkeydown="if(event.key==='Enter') loadEmojiPack()">
+                  <button type="button" class="btn btn-primary btn-sm" onclick="loadEmojiPack()" style="white-space:nowrap;">🔍 Buscar</button>
+                </div>
+
+                <div id="emoji-pack-status" style="font-size:0.8rem; color:var(--text-muted); margin-bottom:6px; display:none;"></div>
+
+                <!-- Emoji grid result -->
+                <div id="emoji-pack-grid" style="display:flex; flex-wrap:wrap; gap:6px; max-height:160px; overflow-y:auto;"></div>
+
+                <p style="margin:10px 0 0; font-size:0.78rem; color:var(--text-muted);">💡 Para encontrar packs: abra qualquer pack de emoji no Telegram, copie o nome que aparece no link <code>t.me/addemoji/<strong>NOME</strong></code> e cole no campo acima.</p>
               </div>
 
               <textarea id="c-text" class="form-control" style="border-radius: 0 0 var(--radius-sm) var(--radius-sm);" placeholder="Digite a mensagem aqui..." oninput="updateCharCount()"></textarea>
@@ -580,10 +597,7 @@
       updateCharCount();
     }
 
-    function insertCustomEmoji() {
-      const emojiId = document.getElementById('tg-emoji-id').value.trim();
-      const fallback = document.getElementById('tg-emoji-fallback').value.trim() || '⭐';
-      if (!emojiId) { toast('Cole o ID do emoji personalizado!', 'error'); return; }
+    function insertCustomEmojiById(emojiId, fallback) {
       const tag = `<tg-emoji emoji-id="${emojiId}">${fallback}</tg-emoji>`;
       const ta = document.getElementById('c-text');
       const start = ta.selectionStart;
@@ -591,8 +605,45 @@
       ta.selectionStart = ta.selectionEnd = start + tag.length;
       ta.focus();
       updateCharCount();
-      document.getElementById('tg-emoji-id').value = '';
-      document.getElementById('tg-emoji-fallback').value = '';
+    }
+
+    async function loadEmojiPack(packName) {
+      const input = document.getElementById('emoji-pack-name');
+      const name = packName || input.value.trim();
+      if (!name) { toast('Digite o nome do pack!', 'error'); return; }
+      if (!packName) input.value = name;
+
+      const status = document.getElementById('emoji-pack-status');
+      const grid = document.getElementById('emoji-pack-grid');
+      status.textContent = '⏳ Buscando pack...';
+      status.style.display = 'block';
+      status.style.color = 'var(--text-muted)';
+      grid.innerHTML = '';
+
+      try {
+        const res = await apiFetch(`/campaigns/emoji-set/${encodeURIComponent(name)}`);
+        status.textContent = `✅ Pack: ${res.title} — ${res.emojis.length} emojis encontrados. Clique para inserir:`;
+        status.style.color = 'var(--success, #22c55e)';
+        grid.innerHTML = '';
+        res.emojis.forEach(e => {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.textContent = e.emoji;
+          btn.title = `Inserir emoji animado (ID: ${e.id})`;
+          btn.style.cssText = 'background:var(--bg-input);border:1px solid var(--border);cursor:pointer;font-size:22px;padding:4px 6px;border-radius:6px;line-height:1;transition:all 0.15s;';
+          btn.onmouseover = () => { btn.style.background = 'var(--accent-glow)'; btn.style.borderColor = 'var(--accent)'; };
+          btn.onmouseout = () => { btn.style.background = 'var(--bg-input)'; btn.style.borderColor = 'var(--border)'; };
+          btn.onclick = () => {
+            insertCustomEmojiById(e.id, e.emoji);
+            btn.style.background = 'var(--success, #22c55e)';
+            setTimeout(() => { btn.style.background = 'var(--bg-input)'; }, 500);
+          };
+          grid.appendChild(btn);
+        });
+      } catch (err) {
+        status.textContent = `❌ ${err.message}`;
+        status.style.color = 'var(--danger)';
+      }
     }
 
     function updateCharCount() {

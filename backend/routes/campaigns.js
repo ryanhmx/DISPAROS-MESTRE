@@ -343,4 +343,38 @@ router.post('/:id/cancel', async (req, res) => {
   }
 });
 
+// GET /api/campaigns/emoji-set/:name — fetch a Telegram custom emoji sticker set
+router.get('/emoji-set/:name', async (req, res) => {
+  try {
+    const { getBot } = require('../bot');
+    const bot = await getBot();
+    if (!bot) return res.status(400).json({ error: 'Bot não configurado' });
+
+    const setName = req.params.name.trim();
+    const set = await bot.getStickerSet(setName);
+
+    // Filter to custom_emoji type stickers only
+    const emojis = set.stickers
+      .filter(s => s.type === 'custom_emoji' && s.custom_emoji_id)
+      .map(s => ({
+        id: s.custom_emoji_id,
+        emoji: s.emoji || '⭐',
+        set_name: set.name,
+        set_title: set.title,
+      }));
+
+    if (emojis.length === 0) {
+      return res.status(400).json({ error: `O pack "${set.title}" não contém emojis customizados. Tente outro pack.` });
+    }
+
+    res.json({ ok: true, title: set.title, emojis });
+  } catch (e) {
+    const msg = e.message || '';
+    if (msg.includes('STICKERSET_INVALID') || msg.includes('not found') || msg.includes('Bad Request')) {
+      return res.status(404).json({ error: `Pack "${req.params.name}" não encontrado. Verifique o nome e tente novamente.` });
+    }
+    res.status(500).json({ error: e.message });
+  }
+});
+
 module.exports = router;
