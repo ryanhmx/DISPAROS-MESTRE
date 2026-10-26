@@ -37,36 +37,42 @@
     </header>
 
     <div class="page-content">
-      <div class="card mb-4" style="display:flex; gap: 16px; padding: 16px 22px;">
-        <div style="flex:1">
-          <label class="form-label">Filtrar Status</label>
+      <div class="card mb-4 filter-bar">
+        <div class="filter-field">
+          <label class="form-label" for="filter-status">Status</label>
           <select id="filter-status" class="form-control" onchange="currentPage=1; loadLog()">
             <option value="">Todos</option>
             <option value="success">✅ Sucesso</option>
             <option value="failed">❌ Falha</option>
+            <option value="deleted">🗑️ Apagado</option>
+            <option value="failed_delete">⚠️ Falha ao apagar</option>
           </select>
         </div>
-        <div style="flex:2">
-          <label class="form-label">Filtrar por Campanha (Opcional)</label>
+        <div class="filter-field filter-field-wide">
+          <label class="form-label" for="filter-campaign">Campanha</label>
           <select id="filter-campaign" class="form-control" onchange="currentPage=1; loadLog()">
             <option value="">Todas as Campanhas</option>
           </select>
         </div>
-        <div style="display:flex; align-items:flex-end">
-          <button class="btn btn-secondary" onclick="loadLog()">🔄 Atualizar</button>
+        <div class="filter-field filter-field-wide">
+          <label class="form-label" for="filter-channel">Canal</label>
+          <select id="filter-channel" class="form-control" onchange="currentPage=1; loadLog()">
+            <option value="">Todos os Canais</option>
+          </select>
         </div>
+        <button class="btn btn-secondary" onclick="loadLog()">🔄 Atualizar</button>
       </div>
 
       <div class="card">
         <div class="table-wrap">
-          <table>
+          <table class="table-stack">
             <thead>
               <tr>
-                <th>Data/Hora</th>
                 <th>Campanha</th>
                 <th>Canal</th>
                 <th>Status</th>
-                <th>Detalhes (Erro)</th>
+                <th>Data/Hora</th>
+                <th>Motivo da falha</th>
               </tr>
             </thead>
             <tbody id="log-tbody">
@@ -75,13 +81,7 @@
           </table>
         </div>
         
-        <div class="flex-between mt-4" style="padding-top:16px; border-top: 1px solid var(--border)">
-          <div style="color:var(--text-muted); font-size:0.85rem" id="pagination-info">Mostrando 0 - 0 de 0</div>
-          <div class="flex gap-2">
-            <button class="btn btn-secondary btn-sm" id="btn-prev" onclick="changePage(-1)">Anterior</button>
-            <button class="btn btn-secondary btn-sm" id="btn-next" onclick="changePage(1)">Próxima</button>
-          </div>
-        </div>
+        <div class="pagination" id="history-pagination"></div>
       </div>
     </div>
   </main>
@@ -94,24 +94,23 @@
 
     async function loadFilters() {
       try {
-        const campaigns = await apiFetch('/campaigns');
-        const sel = document.getElementById('filter-campaign');
-        campaigns.forEach(c => {
-          const opt = document.createElement('option');
-          opt.value = c.id;
-          opt.textContent = c.name;
-          sel.appendChild(opt);
-        });
+        const [campaigns, channels] = await Promise.all([apiFetch('/campaigns'), apiFetch('/channels')]);
+        const campSel = document.getElementById('filter-campaign');
+        campaigns.forEach(c => campSel.add(new Option(c.name, c.id)));
+        const chSel = document.getElementById('filter-channel');
+        channels.forEach(c => chSel.add(new Option(c.name, c.id)));
       } catch(e){}
     }
 
     async function loadLog() {
       const status = document.getElementById('filter-status').value;
       const campId = document.getElementById('filter-campaign').value;
-      
+      const chId = document.getElementById('filter-channel').value;
+
       let q = `?page=${currentPage}&limit=${limit}`;
       if (status) q += `&status=${status}`;
       if (campId) q += `&campaign_id=${campId}`;
+      if (chId) q += `&channel_id=${chId}`;
 
       try {
         const data = await apiFetch(`/stats/log${q}`);
@@ -122,34 +121,46 @@
         } else {
           tb.innerHTML = data.logs.map(l => `
             <tr>
-              <td>${fmtDate(l.sent_at)}</td>
-              <td><strong>${escapeHtml(l.campaign_name)}</strong></td>
+              <td class="cell-title"><strong>${escapeHtml(l.campaign_name || '(campanha excluída)')}</strong></td>
               <td>${escapeHtml(l.channel_name)}</td>
-              <td>${l.status === 'success' ? '<span class="status-badge status-sent">Sucesso</span>' : (l.status === 'deleted' ? '<span class="status-badge status-deleted">Apagado</span>' : '<span class="status-badge status-failed">Falha</span>')}</td>
-              <td style="max-width:300px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${escapeHtml(l.error_message || '')}">${escapeHtml(l.error_message || '-')}</td>
+              <td>${statusBadge(l.status)}</td>
+              <td style="white-space:nowrap">${fmtDate(l.sent_at)}</td>
+              <td class="log-error" title="${escapeHtml(l.error_msg || '')}" ${l.error_msg ? `onclick="this.classList.toggle('expanded')"` : ''}>${l.error_msg ? escapeHtml(friendlyError(l.error_msg)) : '<span style="color:var(--text-muted)">—</span>'}</td>
             </tr>
           `).join('');
         }
 
-        const total = data.total;
-        const start = (currentPage - 1) * limit + 1;
-        const end = Math.min(start + limit - 1, total);
-        document.getElementById('pagination-info').textContent = total > 0 ? `Mostrando ${start} - ${end} de ${total}` : 'Nenhum resultado';
-        
-        document.getElementById('btn-prev').disabled = currentPage === 1;
-        document.getElementById('btn-next').disabled = end >= total;
+        renderPagination('history-pagination', currentPage, Math.ceil(data.total / limit), data.total, p => goToPage(p), limit);
 
+        // Keep the URL in sync so the filtered view can be refreshed or shared
+        const qs = new URLSearchParams();
+        if (status) qs.set('status', status);
+        if (campId) qs.set('campaign', campId);
+        if (chId) qs.set('channel', chId);
+        history.replaceState(null, '', qs.toString() ? `?${qs}` : location.pathname);
       } catch (e) { toast('Erro ao carregar histórico', 'error'); }
     }
 
-    function changePage(delta) {
-      currentPage += delta;
-      if (currentPage < 1) currentPage = 1;
+    // Called from the pagination buttons (renderPagination serializes the callback, so it must use globals)
+    function goToPage(p) {
+      currentPage = Math.max(1, p);
       loadLog();
+      document.querySelector('.main-wrapper').scrollTop = 0;
     }
 
-    loadFilters();
-    loadLog();
+    // Pre-select filters passed in the URL (e.g. links from the dashboard cards)
+    const params = new URLSearchParams(location.search);
+    if (params.get('status')) document.getElementById('filter-status').value = params.get('status');
+
+    loadFilters().then(() => {
+      if (params.get('campaign')) {
+        document.getElementById('filter-campaign').value = params.get('campaign');
+      }
+      if (params.get('channel')) {
+        document.getElementById('filter-channel').value = params.get('channel');
+      }
+      loadLog();
+    });
   </script>
 </body>
 </html>

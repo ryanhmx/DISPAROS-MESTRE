@@ -60,6 +60,7 @@ function initSchema() {
         name              TEXT NOT NULL,
         message_text      TEXT,
         image_path        TEXT,
+        media             TEXT,
         buttons           TEXT,
         parse_mode        TEXT DEFAULT 'HTML',
         status            TEXT DEFAULT 'draft',
@@ -69,6 +70,8 @@ function initSchema() {
       )`);
       // Migration: add auto_delete_hours to existing databases
       db.run(`ALTER TABLE campaigns ADD COLUMN auto_delete_hours INTEGER DEFAULT NULL`, [], () => {});
+      // Migration: media holds a JSON array of { path, type: 'photo' | 'video' } (replaces image_path)
+      db.run(`ALTER TABLE campaigns ADD COLUMN media TEXT`, [], () => {});
       db.run(`CREATE TABLE IF NOT EXISTS campaign_channels (
         campaign_id TEXT REFERENCES campaigns(id) ON DELETE CASCADE,
         channel_id  TEXT REFERENCES channels(id) ON DELETE CASCADE,

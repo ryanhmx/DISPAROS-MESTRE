@@ -24,7 +24,7 @@ router.get('/overview', async (req, res) => {
       FROM scheduled_jobs sj
       JOIN campaigns c ON c.id = sj.campaign_id
       WHERE sj.status = 'pending' AND sj.schedule_type != 'immediate'
-      ORDER BY sj.run_at ASC
+      ORDER BY COALESCE(sj.next_run_at, sj.run_at) ASC
       LIMIT 5
     `);
 
@@ -46,12 +46,13 @@ router.get('/overview', async (req, res) => {
 // GET /api/stats/log
 router.get('/log', async (req, res) => {
   try {
-    const { page = 1, limit = 20, status, campaign_id } = req.query;
+    const { page = 1, limit = 20, status, campaign_id, channel_id } = req.query;
     const offset = (page - 1) * limit;
     let where = [];
     let params = [];
     if (status) { where.push('sl.status = ?'); params.push(status); }
     if (campaign_id) { where.push('sl.campaign_id = ?'); params.push(campaign_id); }
+    if (channel_id) { where.push('sl.channel_id = ?'); params.push(channel_id); }
     const whereClause = where.length ? 'WHERE ' + where.join(' AND ') : '';
 
     const logs = await db.allAsync(`

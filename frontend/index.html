@@ -26,15 +26,6 @@
       <a href="history.html" class="nav-link"><span class="nav-icon">🕒</span> Histórico</a>
     </nav>
 
-    <div class="sidebar-footer">
-      <div class="bot-status" onclick="openModal('bot-modal')" style="cursor: pointer;" data-tip="Configurar Bot">
-        <div class="bot-status-dot" id="bot-dot"></div>
-        <div class="bot-status-info">
-          <div class="bot-status-name" id="bot-name">Sem Bot Configurado</div>
-          <div class="bot-status-label">Clique para configurar</div>
-        </div>
-      </div>
-    </div>
   </aside>
 
   <!-- Main Content -->
@@ -48,44 +39,54 @@
         </div>
       </div>
       <div class="topbar-actions">
-        <a href="campaigns.html" class="btn btn-primary">➕ Nova Campanha</a>
+        <a href="campaigns.html#nova" class="btn btn-primary">➕ Nova Campanha</a>
       </div>
     </header>
 
     <div class="page-content">
+      <!-- First-run checklist, hidden once the bot and a channel are set up -->
+      <div class="card mb-4 onboarding" id="onboarding" style="display:none">
+        <h2 class="card-title" style="margin-bottom:12px">👋 Primeiros passos</h2>
+        <ol class="onboarding-steps">
+          <li id="step-bot"><span>Cole o token do bot criado no @BotFather.</span><button type="button" class="btn btn-sm btn-primary" onclick="openModal('bot-modal')">Configurar bot</button></li>
+          <li id="step-channel"><span>Coloque o bot como administrador do canal e cadastre o Chat ID.</span><a class="btn btn-sm btn-primary" href="channels.html">Adicionar canal</a></li>
+          <li><span>Monte a mensagem e dispare ou agende.</span><a class="btn btn-sm btn-secondary" href="campaigns.html#nova">Criar campanha</a></li>
+        </ol>
+      </div>
+
       <!-- Stats Grid -->
       <div class="stats-grid">
-        <div class="stat-card accent">
+        <a class="stat-card accent" href="channels.html">
           <span class="stat-icon">📡</span>
           <div class="stat-value" id="stat-channels">0</div>
           <div class="stat-label">Canais Ativos</div>
-        </div>
-        <div class="stat-card success">
+        </a>
+        <a class="stat-card success" href="history.html?status=success">
           <span class="stat-icon">✅</span>
           <div class="stat-value" id="stat-sent">0</div>
           <div class="stat-label">Mensagens Enviadas</div>
-        </div>
-        <div class="stat-card warning">
+        </a>
+        <a class="stat-card warning" href="#upcoming">
           <span class="stat-icon">⏰</span>
           <div class="stat-value" id="stat-pending">0</div>
           <div class="stat-label">Disparos Pendentes</div>
-        </div>
-        <div class="stat-card danger">
+        </a>
+        <a class="stat-card danger" href="history.html?status=failed">
           <span class="stat-icon">❌</span>
           <div class="stat-value" id="stat-failed">0</div>
           <div class="stat-label">Falhas de Envio</div>
-        </div>
+        </a>
       </div>
 
-      <div class="grid-2">
+      <div class="grid-2 dashboard-grid">
         <!-- Upcoming Jobs -->
-        <div class="card">
+        <div class="card" id="upcoming">
           <div class="card-header">
             <h2 class="card-title">Próximos Disparos</h2>
-            <a href="campaigns.html" class="btn btn-ghost btn-sm">Ver todas</a>
+            <a href="campaigns.html?status=scheduled" class="btn btn-ghost btn-sm">Ver todas</a>
           </div>
           <div class="table-wrap">
-            <table>
+            <table class="table-stack">
               <thead>
                 <tr>
                   <th>Campanha</th>
@@ -107,16 +108,17 @@
             <a href="history.html" class="btn btn-ghost btn-sm">Histórico Completo</a>
           </div>
           <div class="table-wrap">
-            <table>
+            <table class="table-stack">
               <thead>
                 <tr>
+                  <th>Campanha</th>
                   <th>Canal</th>
                   <th>Status</th>
                   <th>Data</th>
                 </tr>
               </thead>
               <tbody id="recent-tbody">
-                <tr><td colspan="3" class="empty-state-desc">Carregando...</td></tr>
+                <tr><td colspan="4" class="empty-state-desc">Carregando...</td></tr>
               </tbody>
             </table>
           </div>
@@ -124,29 +126,6 @@
       </div>
     </div>
   </main>
-
-  <!-- Bot Token Modal -->
-  <div class="modal-overlay" id="bot-modal">
-    <div class="modal">
-      <div class="modal-header">
-        <h2 class="modal-title">Configuração do Bot Telegram</h2>
-        <button class="btn-icon" onclick="closeModal('bot-modal')">✖</button>
-      </div>
-      <div class="modal-body">
-        <div class="form-group">
-          <label class="form-label">Token do Bot (BotFather)</label>
-          <input type="password" id="bot-token-input" class="form-control" placeholder="123456789:ABCDEF...">
-          <div class="form-hint">
-            Abra o <a href="https://t.me/BotFather" target="_blank" style="color:var(--accent)">@BotFather</a> no Telegram, crie um bot e cole o token aqui.
-          </div>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button class="btn btn-secondary" onclick="closeModal('bot-modal')">Cancelar</button>
-        <button class="btn btn-primary" onclick="saveToken()">Salvar e Conectar</button>
-      </div>
-    </div>
-  </div>
 
   <div id="toast-container"></div>
   <script src="assets/app.js"></script>
@@ -161,6 +140,14 @@
         document.getElementById('stat-pending').textContent = data.pendingJobs;
         document.getElementById('stat-failed').textContent = data.totalFailed;
 
+        // Onboarding: show until the bot is configured and at least one channel exists
+        const settings = await apiFetch('/stats/settings').catch(() => ({}));
+        const hasBot = !!settings.bot_token;
+        const hasChannel = data.totalChannels > 0;
+        document.getElementById('onboarding').style.display = hasBot && hasChannel ? 'none' : '';
+        document.getElementById('step-bot').classList.toggle('done', hasBot);
+        document.getElementById('step-channel').classList.toggle('done', hasChannel);
+
         // Upcoming
         const ut = document.getElementById('upcoming-tbody');
         if (data.upcomingJobs.length === 0) {
@@ -168,9 +155,9 @@
         } else {
           ut.innerHTML = data.upcomingJobs.map(j => `
             <tr>
-              <td><strong>${escapeHtml(j.campaign_name)}</strong></td>
-              <td>${j.schedule_type === 'once' ? 'Único' : 'Recorrente'}</td>
-              <td>${fmtDate(j.run_at)}</td>
+              <td class="cell-title"><strong>${escapeHtml(j.campaign_name)}</strong></td>
+              <td>${j.schedule_type === 'once' ? 'Único' : escapeHtml(cronToText(j.cron_expr))}</td>
+              <td>${fmtDate(j.schedule_type === 'once' ? j.run_at : j.next_run_at)}</td>
             </tr>
           `).join('');
         }
@@ -178,31 +165,19 @@
         // Recent
         const rt = document.getElementById('recent-tbody');
         if (data.recentLog.length === 0) {
-          rt.innerHTML = '<tr><td colspan="3" class="empty-state-desc" style="text-align:center;padding:20px;">Nenhum envio recente.</td></tr>';
+          rt.innerHTML = '<tr><td colspan="4" class="empty-state-desc" style="text-align:center;padding:20px;">Nenhum envio recente.</td></tr>';
         } else {
           rt.innerHTML = data.recentLog.slice(0,5).map(l => `
             <tr>
-              <td><strong>${escapeHtml(l.campaign_name)}</strong></td>
+              <td class="cell-title"><strong>${escapeHtml(l.campaign_name || '(campanha excluída)')}</strong></td>
               <td>${escapeHtml(l.channel_name)}</td>
-              <td>${l.status === 'success' ? '<span style="color:var(--success)">Sucesso</span>' : (l.status === 'deleted' ? '<span style="color:var(--text-muted)">Apagado</span>' : '<span style="color:var(--danger)">Falha</span>')}</td>
+              <td>${statusBadge(l.status)}</td>
+              <td style="white-space:nowrap">${fmtDate(l.sent_at)}</td>
             </tr>
           `).join('');
         }
       } catch (e) {
         toast('Erro ao carregar dashboard', 'error');
-      }
-    }
-
-    async function saveToken() {
-      const token = document.getElementById('bot-token-input').value;
-      if (!token) return toast('Insira o token', 'warning');
-      try {
-        await apiPost('/stats/settings/token', { token });
-        toast('Bot conectado com sucesso!');
-        closeModal('bot-modal');
-        loadBotStatus();
-      } catch (e) {
-        toast(e.message, 'error');
       }
     }
 

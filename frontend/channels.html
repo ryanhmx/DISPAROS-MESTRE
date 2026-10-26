@@ -35,7 +35,7 @@
         </div>
       </div>
       <div class="topbar-actions">
-        <input type="text" id="search-channel" class="form-control" placeholder="🔍 Buscar canal..." oninput="renderChannels()" style="width:250px;">
+        <input type="search" id="search-channel" class="form-control" placeholder="🔍 Buscar canal..." aria-label="Buscar canal" oninput="channelPage = 1; renderChannels()" style="width:250px;">
         <button class="btn btn-secondary" onclick="openBulkModal()">➕ Adicionar em Massa</button>
         <button class="btn btn-primary" onclick="openChannelModal()">➕ Adicionar Canal</button>
       </div>
@@ -45,11 +45,11 @@
 
       <div class="card">
         <div class="table-wrap">
-          <table>
+          <table class="table-stack">
             <thead>
               <tr>
                 <th>Nome / Username</th>
-                <th>Chat ID</th>
+                <th class="col-chatid">Chat ID</th>
                 <th>Status</th>
                 <th>Ações</th>
               </tr>
@@ -66,7 +66,7 @@
 
   <!-- Add/Edit Channel Modal -->
   <div class="modal-overlay" id="channel-modal">
-    <div class="modal">
+    <form class="modal" onsubmit="event.preventDefault(); saveChannel()">
       <div class="modal-header">
         <h2 class="modal-title" id="cm-title">Adicionar Canal</h2>
         <button class="btn-icon" onclick="closeModal('channel-modal')">✖</button>
@@ -74,24 +74,24 @@
       <div class="modal-body">
         <input type="hidden" id="cm-id">
         <div class="form-group">
-          <label class="form-label">Nome de exibição</label>
-          <input type="text" id="cm-name" class="form-control" placeholder="Ex: Meu Canal Principal">
+          <label class="form-label" for="cm-name">Nome de exibição <span style="color:var(--danger)">*</span></label>
+          <input type="text" id="cm-name" class="form-control" placeholder="Ex: Meu Canal Principal" required>
         </div>
         <div class="form-group">
-          <label class="form-label">Chat ID <span style="color:var(--danger)">*</span></label>
-          <input type="text" id="cm-chatid" class="form-control" placeholder="Ex: -100123456789">
+          <label class="form-label" for="cm-chatid">Chat ID <span style="color:var(--danger)">*</span></label>
+          <input type="text" id="cm-chatid" class="form-control" placeholder="Ex: -100123456789" inputmode="numeric" autocomplete="off" required>
           <div class="form-hint">Obrigatório. Encaminhe uma mensagem do canal para o @RawDataBot para descobrir o ID. Deve começar com -100.</div>
         </div>
         <div class="form-group">
-          <label class="form-label">Username (Opcional)</label>
+          <label class="form-label" for="cm-username">Username (Opcional)</label>
           <input type="text" id="cm-username" class="form-control" placeholder="Ex: @meucanal">
         </div>
       </div>
       <div class="modal-footer">
-        <button class="btn btn-secondary" onclick="closeModal('channel-modal')">Cancelar</button>
-        <button class="btn btn-primary" onclick="saveChannel()">Salvar Canal</button>
+        <button type="button" class="btn btn-secondary" onclick="closeModal('channel-modal')">Cancelar</button>
+        <button type="submit" class="btn btn-primary">Salvar Canal</button>
       </div>
-    </div>
+    </form>
   </div>
 
   <!-- Bulk Add Modal -->
@@ -99,12 +99,12 @@
     <div class="modal">
       <div class="modal-header">
         <h2 class="modal-title">Adicionar Canais em Massa</h2>
-        <button class="modal-close" onclick="closeModal('bulk-modal')">✖</button>
+        <button class="btn-icon" aria-label="Fechar" onclick="closeModal('bulk-modal')">✖</button>
       </div>
       <div class="modal-body">
         <form onsubmit="bulkAddChannels(event)">
           <div class="form-group">
-            <label>Canais (um por linha)</label>
+            <label class="form-label" for="bulk-text">Canais (um por linha)</label>
             <p style="font-size:0.8rem; color:var(--text-muted); margin-bottom:8px;">Formato: <strong>Nome, ChatID</strong></p>
             <textarea id="bulk-text" class="form-control" rows="8" placeholder="Exemplo:&#10;Canal Oficial, -10012345678&#10;Grupo Secreto, -10044455588"></textarea>
           </div>
@@ -149,28 +149,39 @@
       const paginated = filtered.slice(start, start + PAGE_SIZE);
 
       if (paginated.length === 0) {
-        tb.innerHTML = '<tr><td colspan="4" class="empty-state">Nenhum canal encontrado.</td></tr>';
+        tb.innerHTML = channels.length === 0
+          ? `<tr><td colspan="4" class="empty-state">
+               <div class="empty-state-icon">📡</div>
+               <div class="empty-state-title">Nenhum canal cadastrado</div>
+               <div class="empty-state-desc" style="margin-bottom:16px">Adicione o bot como administrador do canal e cadastre o Chat ID aqui.</div>
+               <button class="btn btn-primary" onclick="openChannelModal()">➕ Adicionar Canal</button>
+             </td></tr>`
+          : '<tr><td colspan="4" class="empty-state">Nenhum canal encontrado para essa busca.</td></tr>';
       } else {
         tb.innerHTML = paginated.map(c => `
-          <tr>
-            <td>
+          <tr style="${c.active ? '' : 'opacity:0.6'}">
+            <td class="cell-title">
               <div style="font-weight:600">${escapeHtml(c.name)}</div>
-              <div style="font-size:0.75rem;color:var(--text-muted)">${escapeHtml(c.username || 'Sem username')}</div>
+              <div style="font-size:0.75rem;color:var(--text-muted)">${c.username ? escapeHtml(c.username) : 'Sem username'}<span class="chatid-inline"> · ${escapeHtml(c.chat_id)}</span></div>
             </td>
-            <td style="font-family:monospace;color:var(--text-secondary)">${escapeHtml(c.chat_id)}</td>
+            <td class="col-chatid" style="font-family:monospace;color:var(--text-secondary)">${escapeHtml(c.chat_id)}</td>
             <td>
-              <div style="display:flex; align-items:center; gap:8px;">
-                 <label class="toggle-switch">
-                    <input type="checkbox" ${c.active ? 'checked' : ''} onchange="toggleChannel('${c.id}', ${c.active})">
+              <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; justify-content:inherit">
+                 <label class="toggle-switch" title="${c.active ? 'Ativo: recebe disparos' : 'Pausado: não recebe disparos'}">
+                    <input type="checkbox" ${c.active ? 'checked' : ''} aria-label="Canal ativo" onchange="toggleChannel('${c.id}', ${c.active})">
                     <span class="slider"></span>
                  </label>
-                 ${c.verified ? '<span class="badge badge-success">Verificado</span>' : '<span class="badge badge-warning">Não Verificado</span>'}
+                 <span style="font-size:0.8rem; color:var(--text-secondary); min-width:48px">${c.active ? 'Ativo' : 'Pausado'}</span>
+                 ${c.verified ? '<span class="badge badge-success">Verificado</span>' : '<span class="badge badge-warning" title="Clique em Testar para confirmar que o bot é admin do canal">Não verificado</span>'}
               </div>
             </td>
-            <td>
-              <button class="btn btn-sm btn-secondary" onclick="verifyChannel('${c.id}')" title="Testar Conexão">🔄 Testar</button>
-              <button class="btn btn-sm btn-secondary" onclick="editChannel('${c.id}')">✏️ Editar</button>
-              <button class="btn btn-sm btn-danger" onclick="deleteChannel('${c.id}')">🗑️</button>
+            <td class="cell-actions">
+              <div class="row-actions" style="flex-wrap:nowrap">
+                <button class="btn btn-sm btn-secondary" onclick="verifyChannel('${c.id}', this)" title="Testar se o bot tem acesso ao canal" aria-label="Testar">🔄<span class="btn-label"> Testar</span></button>
+                <button class="btn btn-sm btn-secondary" onclick="editChannel('${c.id}')" title="Editar" aria-label="Editar">✏️<span class="btn-label"> Editar</span></button>
+                <a class="btn btn-sm btn-secondary" href="history.html?channel=${c.id}" title="Ver envios para este canal" aria-label="Histórico do canal">📋</a>
+                <button class="btn btn-sm btn-ghost btn-danger-ghost" onclick="deleteChannel('${c.id}')" title="Excluir canal" aria-label="Excluir canal">🗑️</button>
+              </div>
             </td>
           </tr>
         `).join('');
@@ -206,7 +217,10 @@
         chat_id: document.getElementById('cm-chatid').value,
         username: document.getElementById('cm-username').value
       };
+      data.name = data.name.trim();
+      data.chat_id = data.chat_id.trim();
       if (!data.name || !data.chat_id) return toast('Nome e Chat ID são obrigatórios', 'warning');
+      if (!/^-?\d+$/.test(data.chat_id)) return toast('O Chat ID deve conter só números (ex: -100123456789)', 'warning');
       
       const btn = document.querySelector('#channel-modal .btn-primary');
       let oldHtml = 'Salvar';
@@ -230,27 +244,36 @@
       }
     }
 
-    async function verifyChannel(id) {
-      toast('Verificando conexão...', 'info');
+    async function verifyChannel(id, btn) {
+      const oldHtml = btn ? btn.innerHTML : '';
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner" style="width:12px;height:12px"></span> Testando...';
+      }
       try {
         const res = await apiPost(`/channels/${id}/verify`);
         if (res.ok) {
           toast(`Conectado! Canal: ${res.title}`);
           loadChannels();
         } else {
-          toast(`Falha: ${res.error}`, 'error');
+          toast(`Falha: ${friendlyError(res.error)}`, 'error');
         }
       } catch (e) { toast(e.message, 'error'); }
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = oldHtml;
+      }
     }
 
     async function deleteChannel(id) {
-      showConfirm('Excluir Canal', 'Tem certeza que deseja excluir este canal?', async () => {
+      const ch = channels.find(c => c.id === id);
+      showConfirm('Excluir Canal', `Excluir "${ch ? ch.name : 'este canal'}"? Ele será removido de todas as campanhas.`, async () => {
         try {
           await apiDelete(`/channels/${id}`);
           toast('Canal excluído');
           loadChannels();
         } catch (e) { toast(e.message, 'error'); }
-      });
+      }, 'Excluir');
     }
 
     async function toggleChannel(id, currentActive) {
@@ -283,7 +306,7 @@
           channelsToAdd.push({ name, chat_id });
         }
       }
-      if (channelsToAdd.length === 0) return toast('Nenhum canal válido encontrado. Verifique o formato.', 'warning');
+      if (channelsToAdd.length === 0) return toast('Nenhum canal válido encontrado. Use o formato: Nome, ChatID', 'warning');
       
       const btn = e.target.querySelector('button[type="submit"]');
       const oldHtml = btn.innerHTML;
@@ -292,7 +315,10 @@
 
       try {
         const res = await apiPost('/channels/bulk', { channels: channelsToAdd });
-        toast(`${res.added} canais importados com sucesso!`, 'success');
+        const skipped = channelsToAdd.length - res.added;
+        toast(skipped > 0
+          ? `${res.added} canais importados. ${skipped} ignorados (Chat ID já cadastrado).`
+          : `${res.added} canais importados com sucesso!`, skipped > 0 ? 'warning' : 'success');
         closeModal('bulk-modal');
         loadChannels();
       } catch (err) {
