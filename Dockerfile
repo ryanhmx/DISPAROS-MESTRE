@@ -1,5 +1,8 @@
 FROM node:20-slim
 
+# ffmpeg reads video duration/size and makes thumbnails for course uploads
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg && rm -rf /var/lib/apt/lists/*
+
 # Set working directory
 WORKDIR /app
 

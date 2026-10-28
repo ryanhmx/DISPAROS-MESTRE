@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { db } = require('../db');
-const { verifyBot, resetBot } = require('../bot');
+const { verifyBot, resetBot, getToken } = require('../bot');
 
 // GET /api/stats/overview
 router.get('/overview', async (req, res) => {
@@ -102,6 +102,25 @@ router.post('/settings/token', async (req, res) => {
     );
     resetBot();
     res.json({ ok: true, bot_username: result.username, bot_name: result.name });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/stats/settings/api-url { url } — local telegram-bot-api server, empty = cloud
+router.post('/settings/api-url', async (req, res) => {
+  try {
+    const url = String(req.body.url || '').trim().replace(/\/+$/, '');
+    if (url && !/^https?:\/\/[^\s]+$/i.test(url)) return res.status(400).json({ error: 'URL inválida (ex: http://localhost:8081)' });
+    const token = await getToken();
+    if (url && token) {
+      const result = await verifyBot(token, url);
+      if (!result.ok) return res.status(400).json({ error: `O servidor não respondeu: ${result.error}` });
+    }
+    if (url) await db.runAsync("INSERT OR REPLACE INTO settings (key, value) VALUES ('bot_api_url', ?)", [url]);
+    else await db.runAsync("DELETE FROM settings WHERE key = 'bot_api_url'");
+    resetBot();
+    res.json({ ok: true, url });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

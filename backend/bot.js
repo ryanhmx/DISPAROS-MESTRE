@@ -4,12 +4,34 @@ const fs = require('fs');
 
 let botInstance = null;
 
-function getToken() {
+// Bot API upload limits: the cloud server takes 50 MB per file, a local
+// telegram-bot-api server (https://github.com/tdlib/telegram-bot-api) takes 2000 MB
+const CLOUD_UPLOAD_LIMIT = 50 * 1024 * 1024;
+const LOCAL_UPLOAD_LIMIT = 2000 * 1024 * 1024;
+
+function getSetting(key) {
   return new Promise((resolve) => {
-    db.get("SELECT value FROM settings WHERE key = 'bot_token'", [], (err, row) => {
+    db.get('SELECT value FROM settings WHERE key = ?', [key], (err, row) => {
       resolve(row ? row.value : null);
     });
   });
+}
+
+function getToken() {
+  return getSetting('bot_token');
+}
+
+// Empty means the official cloud server
+async function getApiUrl() {
+  return (await getSetting('bot_api_url')) || '';
+}
+
+async function getUploadLimit() {
+  return (await getApiUrl()) ? LOCAL_UPLOAD_LIMIT : CLOUD_UPLOAD_LIMIT;
+}
+
+function createBot(token, apiUrl) {
+  return new TelegramBot(token, { polling: false, ...(apiUrl ? { baseApiUrl: apiUrl } : {}) });
 }
 
 async function getBot() {
@@ -18,7 +40,7 @@ async function getBot() {
 
   if (!botInstance) {
     try {
-      botInstance = new TelegramBot(token, { polling: false });
+      botInstance = createBot(token, await getApiUrl());
     } catch (e) {
       botInstance = null;
     }
@@ -30,9 +52,9 @@ function resetBot() {
   botInstance = null;
 }
 
-async function verifyBot(token) {
+async function verifyBot(token, apiUrl) {
   try {
-    const bot = new TelegramBot(token, { polling: false });
+    const bot = createBot(token, apiUrl === undefined ? await getApiUrl() : apiUrl);
     const me = await bot.getMe();
     return { ok: true, username: me.username, name: me.first_name };
   } catch (e) {
@@ -182,4 +204,4 @@ async function deleteMessageFromChannel(chatId, messageId) {
   return { ok: true };
 }
 
-module.exports = { getCampaignMedia, getBot, resetBot, verifyBot, verifyChannel, sendCampaignToChannel, deleteMessageFromChannel, getToken };
+module.exports = { getApiUrl, getUploadLimit, getCampaignMedia, getBot, resetBot, verifyBot, verifyChannel, sendCampaignToChannel, deleteMessageFromChannel, getToken };

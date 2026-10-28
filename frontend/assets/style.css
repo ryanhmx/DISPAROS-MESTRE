@@ -1170,3 +1170,10 @@ select.form-control {
   .table-stack .row-actions > .btn { flex: 1 1 auto; justify-content: center; }
   .table-stack td.empty-state, .table-stack td[colspan] { display: block; text-align: center; }
 }
+
+/* ── Shared small pieces ─────────────────────── */
+.btn-reset { background: none; border: 0; padding: 0; margin: 0; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.btn-reset:hover { color: var(--accent-hover); }
+.advanced-box { margin-top: 18px; border-top: 1px solid var(--border); padding-top: 14px; }
+.advanced-box summary { cursor: pointer; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 12px; }
+.advanced-box summary:hover { color: var(--text-primary); }

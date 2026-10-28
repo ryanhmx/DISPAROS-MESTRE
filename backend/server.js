@@ -4,6 +4,7 @@ const fileUpload = require('express-fileupload');
 const path = require('path');
 const { initSchema } = require('./db');
 const { restorePendingJobs, startAutoDeleteCron } = require('./scheduler');
+const { restoreCourses } = require('./courses');
 
 const app = express();
 const PORT = process.env.PORT || 3131;
@@ -38,6 +39,7 @@ app.use('/uploads', express.static(path.join(__dirname, 'data', 'uploads')));
 app.use('/api/channels', require('./routes/channels'));
 app.use('/api/campaigns', require('./routes/campaigns'));
 app.use('/api/stats', require('./routes/stats'));
+app.use('/api/courses', require('./routes/courses'));
 
 // SPA fallback
 app.get('*', (req, res) => {
@@ -51,6 +53,7 @@ async function main() {
 
   await restorePendingJobs();
   startAutoDeleteCron();
+  await restoreCourses();
   console.log('✅ Pending jobs restored');
 
   app.listen(PORT, () => {

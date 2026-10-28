@@ -1,0 +1,1120 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cursos — Disparos do Mestre</title>
+  <link rel="stylesheet" href="assets/style.css">
+  <style>
+    .course-layout { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 24px; align-items: start; }
+    .course-layout > .col { min-width: 0; display: flex; flex-direction: column; gap: 24px; }
+    .course-tabs { display: none; }
+    /* Narrow screens: one section at a time instead of a very long page */
+    @media (max-width: 1100px) {
+      .course-layout { display: block; }
+      .course-layout[data-tab="files"] .panel:not([data-panel="files"]),
+      .course-layout[data-tab="order"] .panel:not([data-panel="order"]),
+      .course-layout[data-tab="settings"] .panel:not([data-panel="settings"]) { display: none; }
+      .course-tabs {
+        display: flex; gap: 4px; padding: 4px; margin-bottom: 16px;
+        position: sticky; top: 0; z-index: 30;
+        background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius);
+      }
+      .course-tabs button {
+        flex: 1; min-height: 42px; border: 0; border-radius: var(--radius-sm); background: none;
+        color: var(--text-secondary); font: inherit; font-size: 0.85rem; font-weight: 600; cursor: pointer;
+      }
+      .course-tabs button[aria-selected="true"] { background: var(--accent); color: #fff; }
+      #tab-count { opacity: 0.8; font-weight: 400; }
+    }
+
+    .progress { height: 8px; background: var(--bg-input); border-radius: 99px; overflow: hidden; border: 1px solid var(--border); }
+    .progress-bar { height: 100%; background: linear-gradient(90deg, var(--accent), var(--success)); border-radius: 99px; transition: width .4s; }
+    .progress-label { font-size: 0.78rem; color: var(--text-muted); margin-top: 6px; display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+    .cell-progress { min-width: 160px; }
+
+    .course-head { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; align-items: flex-start; }
+    .course-head-title { font-size: 1.15rem; font-weight: 700; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .course-head-meta { color: var(--text-muted); font-size: 0.82rem; margin-top: 4px; }
+    .course-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .course-alert { margin-top: 14px; padding: 10px 14px; border-radius: var(--radius-sm); background: var(--warning-glow); border: 1px solid rgba(245,158,11,0.35); color: var(--text-primary); font-size: 0.85rem; }
+    .course-alert.danger { background: var(--danger-glow); border-color: rgba(239,68,68,0.35); }
+
+    .dropzone { border: 2px dashed var(--border-light); border-radius: var(--radius); padding: 22px; text-align: center; transition: border-color var(--transition), background var(--transition); }
+    .dropzone.over { border-color: var(--accent); background: var(--accent-glow); }
+    .dropzone-title { font-weight: 600; margin-bottom: 4px; }
+    .dropzone-hint { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 14px; }
+    .dropzone-actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+    .import-row { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+    .import-row select { flex: 1 1 200px; }
+    .upload-status { margin-top: 14px; font-size: 0.82rem; color: var(--text-secondary); }
+    .upload-status .progress { margin-top: 6px; }
+
+    .tree { display: flex; flex-direction: column; gap: 14px; }
+    details.tree-module > summary { list-style: none; cursor: pointer; }
+    details.tree-module > summary::-webkit-details-marker { display: none; }
+    .tree-caret { transition: transform .2s; color: var(--text-muted); font-size: 0.8rem; width: 12px; }
+    details.tree-module[open] .tree-caret { transform: rotate(90deg); }
+    .tree-count { font-size: 0.74rem; color: var(--text-muted); white-space: nowrap; }
+    .tree-sub { display: flex; align-items: center; gap: 8px; padding: 9px 14px; border-top: 1px solid var(--border); background: rgba(91,106,240,0.06); font-size: 0.86rem; font-weight: 600; }
+    .tree-sub .tree-title { font-weight: 600; flex: 1; min-width: 0; }
+    .howto { margin-top: 12px; font-size: 0.82rem; color: var(--text-secondary); }
+    .howto summary { cursor: pointer; color: var(--accent-hover); font-weight: 500; }
+    .howto p, .howto ul { margin-top: 8px; line-height: 1.5; }
+    .howto ul { padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
+    .folder-dialog select { margin-bottom: 12px; }
+    .tree-module { border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+    .tree-module-head { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: var(--bg-surface); border-bottom: 1px solid var(--border); }
+    .tree-module-title { font-weight: 600; flex: 1; min-width: 0; overflow-wrap: anywhere; }
+    .tree-row { display: flex; align-items: center; gap: 10px; padding: 9px 14px; border-top: 1px solid var(--border); }
+    .tree-row:first-of-type { border-top: 0; }
+    .tree-row.skipped .tree-title { text-decoration: line-through; color: var(--text-muted); }
+    .tree-icon { width: 22px; text-align: center; flex-shrink: 0; }
+    .tree-main { flex: 1; min-width: 0; }
+    .tree-title { font-size: 0.88rem; overflow-wrap: anywhere; }
+    .tree-meta { font-size: 0.74rem; color: var(--text-muted); margin-top: 2px; display: flex; gap: 10px; flex-wrap: wrap; }
+    .tree-meta .too-big { color: var(--danger); }
+    .tree-error { font-size: 0.76rem; color: var(--danger); margin-top: 3px; overflow-wrap: anywhere; }
+    .tree-actions { display: flex; gap: 4px; flex-shrink: 0; align-items: center; }
+    .tree-actions .btn { padding: 6px 8px; min-width: 34px; justify-content: center; }
+    .tag-chip { font-family: ui-monospace, monospace; font-size: 0.72rem; color: var(--accent-hover); }
+
+    .var-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+    .var-chips button { font-family: ui-monospace, monospace; font-size: 0.72rem; padding: 3px 8px; border-radius: 99px; background: var(--bg-input); border: 1px solid var(--border); color: var(--text-secondary); cursor: pointer; }
+    .var-chips button:hover { border-color: var(--accent); color: var(--text-primary); }
+    .caption-preview { margin-top: 10px; padding: 12px 14px; border-radius: var(--radius-sm); background: #1c2733; font-size: 0.85rem; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.45; }
+    .caption-preview-label { font-size: 0.72rem; color: var(--text-muted); margin-top: 10px; }
+    .check-list { display: flex; flex-direction: column; gap: 10px; }
+    .check-item { display: flex; gap: 10px; align-items: flex-start; font-size: 0.86rem; cursor: pointer; }
+    .check-item input { margin-top: 3px; accent-color: var(--accent); width: 16px; height: 16px; flex-shrink: 0; }
+    .check-item small { display: block; color: var(--text-muted); font-size: 0.76rem; }
+    .settings-actions { display: flex; justify-content: flex-end; margin-top: 18px; }
+
+    .m-label { display: none; }
+    .back-link { display: none; font-size: 0.82rem; color: var(--text-muted); text-decoration: none; margin-bottom: 8px; }
+    @media (max-width: 640px) {
+      .m-label { display: inline; }
+      .tree-actions .btn { min-width: 0; padding: 7px 10px; font-size: 0.78rem; }
+      /* The back link in the course card replaces the full-width topbar button */
+      .back-link { display: inline-block; }
+      #btn-back { display: none !important; }
+      .course-actions { width: 100%; }
+      .course-actions > .btn { flex: 1 1 auto; justify-content: center; }
+      .tree-row { flex-wrap: wrap; padding: 10px 12px; }
+      .tree-sub { padding: 9px 12px; }
+      .tree-main { flex: 1 1 calc(100% - 40px); }
+      .tree-actions { margin-left: 32px; }
+      .dropzone { padding: 16px 12px; }
+      .dropzone-actions > .btn { flex: 1 1 100%; justify-content: center; }
+    }
+  </style>
+</head>
+<body>
+
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon">🚀</div>
+      <div>
+        <div class="logo-text">Disparos do Mestre</div>
+        <div class="logo-sub">Sistema de Disparos</div>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-title">Menu Principal</div>
+      <a href="index.html" class="nav-link"><span class="nav-icon">📊</span> Dashboard</a>
+      <a href="campaigns.html" class="nav-link"><span class="nav-icon">📝</span> Campanhas</a>
+      <a href="channels.html" class="nav-link"><span class="nav-icon">📡</span> Canais</a>
+      <a href="courses.html" class="nav-link active"><span class="nav-icon">🎓</span> Cursos</a>
+      <a href="history.html" class="nav-link"><span class="nav-icon">🕒</span> Histórico</a>
+    </nav>
+  </aside>
+
+  <main class="main-wrapper">
+    <header class="topbar">
+      <div class="flex-center">
+        <button class="menu-toggle" onclick="toggleMenu()">☰</button>
+        <div>
+          <h1 class="topbar-title" id="page-title">Cursos</h1>
+          <div class="topbar-subtitle">Envie um curso inteiro para um canal, organizado em módulos, com hashtags e sumário</div>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <button class="btn btn-secondary" id="btn-back" style="display:none" onclick="location.hash = ''">← Voltar</button>
+        <button class="btn btn-primary" id="btn-new" onclick="openNewCourse()">➕ Novo curso</button>
+      </div>
+    </header>
+
+    <div class="page-content">
+
+      <!-- List -->
+      <div id="view-list" class="card">
+        <div class="table-wrap">
+          <table class="table-stack" id="courses-table">
+            <thead>
+              <tr>
+                <th>Curso</th>
+                <th>Canal</th>
+                <th>Progresso</th>
+                <th>Status</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody id="courses-tbody">
+              <tr><td colspan="5" class="empty-state-desc">Carregando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Detail -->
+      <div id="view-detail" style="display:none">
+        <div class="card" style="margin-bottom:24px">
+          <div class="course-head">
+            <div style="min-width:0">
+              <a href="#" class="back-link" onclick="event.preventDefault(); location.hash = ''">← Todos os cursos</a>
+              <div class="course-head-title"><span id="d-name"></span><span id="d-status"></span></div>
+              <div class="course-head-meta" id="d-meta"></div>
+            </div>
+            <div class="course-actions" id="d-actions"></div>
+          </div>
+          <div style="margin-top:16px">
+            <div class="progress"><div class="progress-bar" id="d-progress" style="width:0"></div></div>
+            <div class="progress-label"><span id="d-progress-text"></span><span id="d-progress-size"></span></div>
+          </div>
+          <div id="d-alerts"></div>
+        </div>
+
+        <div class="course-tabs" id="course-tabs" role="tablist" aria-label="Seções do curso">
+          <button type="button" role="tab" data-tab="files">📁 Arquivos</button>
+          <button type="button" role="tab" data-tab="order">📋 Aulas <span id="tab-count"></span></button>
+          <button type="button" role="tab" data-tab="settings">⚙️ Ajustes</button>
+        </div>
+
+        <div class="course-layout" id="course-layout" data-tab="files">
+          <div class="col">
+            <div class="card panel" data-panel="files">
+              <div class="card-header">
+                <div>
+                  <div class="card-title">Arquivos do curso</div>
+                  <div class="card-subtitle">Cada pasta vira um módulo 📂, cada subpasta uma seção 📁 e cada arquivo uma aula</div>
+                </div>
+              </div>
+              <div class="dropzone" id="dropzone">
+                <div class="dropzone-title" id="dropzone-title">Arraste a pasta do curso para cá</div>
+                <div class="dropzone-hint" id="limit-hint">Vídeos, PDFs, áudios e imagens. Arquivos de sistema são ignorados.</div>
+                <div class="dropzone-actions" id="dropzone-actions"></div>
+                <input type="file" id="pick-folder" webkitdirectory multiple hidden>
+                <input type="file" id="pick-files" multiple hidden>
+                <input type="file" id="pick-zip" accept=".zip,application/zip,application/x-zip-compressed" hidden>
+              </div>
+              <details class="howto" id="zip-howto">
+                <summary>Como enviar o curso pelo celular</summary>
+                <p>O celular não deixa escolher uma pasta inteira. Compacte a pasta do curso em <b>.zip</b> e envie o arquivo: as pastas e subpastas são mantidas.</p>
+                <ul>
+                  <li><b>iPhone:</b> app Arquivos → segure a pasta do curso → <b>Comprimir</b> → aqui, toque em <b>Enviar curso (.zip)</b>.</li>
+                  <li><b>Android:</b> app Arquivos (ou Files by Google) → segure a pasta → ⋮ → <b>Compactar</b>.</li>
+                  <li>Também dá para usar <b>Adicionar aulas</b> e escolher em qual pasta elas entram, uma pasta por vez.</li>
+                </ul>
+              </details>
+              <div class="import-row" id="import-row" style="display:none">
+                <select id="import-folder" class="form-control" aria-label="Pasta no servidor"></select>
+                <button type="button" class="btn btn-secondary" onclick="importFolder()">🗄️ Importar do servidor</button>
+              </div>
+              <div class="form-hint" id="import-hint"></div>
+              <div class="upload-status" id="upload-status" style="display:none"></div>
+            </div>
+
+            <div class="card panel" data-panel="order">
+              <div class="card-header">
+                <div>
+                  <div class="card-title">Ordem de envio</div>
+                  <div class="card-subtitle">Ordem natural dos nomes (Aula 2 vem antes de Aula 10). Toque (ou clique) no título para renomear e em 📁 para mudar a aula de pasta.</div>
+                </div>
+              </div>
+              <div class="tree" id="tree"></div>
+            </div>
+          </div>
+
+          <div class="col">
+            <form class="card panel" data-panel="settings" id="settings-form" onsubmit="event.preventDefault(); saveSettings()">
+              <div class="card-header"><div class="card-title">Configurações</div></div>
+              <div class="form-group">
+                <label class="form-label" for="s-name">Nome do curso</label>
+                <input id="s-name" class="form-control" required maxlength="200">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="s-channel">Canal de destino</label>
+                <select id="s-channel" class="form-control"></select>
+                <div class="form-hint">O bot precisa ser administrador do canal, com permissão para publicar e fixar mensagens.</div>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="s-description">Mensagem de abertura <span style="color:var(--text-muted); font-weight:400">(opcional)</span></label>
+                <textarea id="s-description" class="form-control" rows="3" placeholder="Bem-vindo ao curso! Aqui você encontra…"></textarea>
+                <div class="form-hint">Enviada antes da primeira aula, junto com o nome do curso.</div>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="s-template">Legenda de cada aula</label>
+                <textarea id="s-template" class="form-control" rows="4" style="font-family:ui-monospace,monospace; font-size:0.82rem"></textarea>
+                <div class="var-chips" id="var-chips"></div>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="s-signature">Assinatura</label>
+                <input id="s-signature" class="form-control" maxlength="200" placeholder="@seucanal">
+                <div class="form-hint">Vai no fim da legenda de todas as aulas e no fim do sumário.</div>
+                <div class="caption-preview-label" id="preview-label">Prévia da primeira aula</div>
+                <div class="caption-preview" id="caption-preview"></div>
+              </div>
+              <div class="grid-2">
+                <div class="form-group">
+                  <label class="form-label" for="s-prefix">Prefixo das hashtags</label>
+                  <input id="s-prefix" class="form-control" maxlength="20" placeholder="Ex: PY">
+                  <div class="form-hint" id="prefix-hint">#M01 #M01A01</div>
+                </div>
+                <div class="form-group">
+                  <label class="form-label" for="s-delay">Intervalo entre mensagens</label>
+                  <select id="s-delay" class="form-control">
+                    <option value="1">1 segundo</option>
+                    <option value="2">2 segundos</option>
+                    <option value="3">3 segundos</option>
+                    <option value="5">5 segundos</option>
+                    <option value="10">10 segundos</option>
+                    <option value="30">30 segundos</option>
+                    <option value="60">1 minuto</option>
+                  </select>
+                </div>
+              </div>
+              <div class="check-list">
+                <label class="check-item"><input type="checkbox" id="s-index">
+                  <span>Enviar sumário no final<small>Lista de módulos e aulas com link para cada uma</small></span></label>
+                <label class="check-item"><input type="checkbox" id="s-pin">
+                  <span>Fixar o sumário no canal</span></label>
+                <label class="check-item"><input type="checkbox" id="s-protect">
+                  <span>Proteger conteúdo<small>Membros não conseguem encaminhar nem salvar as aulas</small></span></label>
+                <label class="check-item"><input type="checkbox" id="s-delete">
+                  <span>Apagar do servidor após enviar<small>Libera espaço em disco. Não apaga pastas importadas do servidor.</small></span></label>
+              </div>
+              <div class="settings-actions">
+                <button type="submit" class="btn btn-primary">💾 Salvar configurações</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- New course -->
+  <div class="modal-overlay" id="new-modal">
+    <form class="modal" onsubmit="event.preventDefault(); createCourse()">
+      <div class="modal-header">
+        <h2 class="modal-title">Novo curso</h2>
+        <button type="button" class="btn-icon" aria-label="Fechar" onclick="closeModal('new-modal')">✖</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label" for="n-name">Nome do curso <span style="color:var(--danger)">*</span></label>
+          <input id="n-name" class="form-control" placeholder="Ex: Python do Zero" required maxlength="200">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="n-channel">Canal de destino</label>
+          <select id="n-channel" class="form-control" required></select>
+          <div class="form-hint">O bot precisa ser administrador desse canal.</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('new-modal')">Cancelar</button>
+        <button type="submit" class="btn btn-primary">Criar e adicionar arquivos</button>
+      </div>
+    </form>
+  </div>
+
+  <div id="toast-container"></div>
+  <script src="assets/app.js"></script>
+  <script>
+    const TYPE_ICONS = { video: '🎬', photo: '🖼️', audio: '🎧', document: '📄' };
+    const VARIABLES = [
+      ['aula', 'Título da aula'], ['caminho', 'Módulo › seção › subseção'], ['modulo', 'Nome do módulo'],
+      ['pasta', 'Nome da pasta da aula'], ['curso', 'Nome do curso'], ['tag', 'Hashtag da aula'],
+      ['tag_modulo', 'Hashtag do módulo'], ['tag_pasta', 'Hashtag da pasta da aula'], ['n', 'Número da aula no curso'],
+      ['total', 'Total de aulas'], ['n_modulo', 'Número do módulo'], ['n_aula', 'Número da aula no módulo'],
+      ['arquivo', 'Nome do arquivo'],
+    ];
+    const IGNORED = /^(\.|~\$)|^(thumbs\.db|desktop\.ini)$|\.(url|lnk|ini|part|crdownload|tmp)$/i;
+    const HARD_LIMIT = 2000 * 1024 * 1024;
+
+    let info = { upload_limit: 50 * 1024 * 1024, import_folders: [] };
+    let channels = [];
+    let course = null;      // course open in the detail view
+    let pollTimer = null;
+    let uploading = false;
+    let settingsDirty = false;
+    let activeTab = 'files';
+    const collapsed = new Set(); // module keys folded in the tree, kept across refreshes
+
+    // Phones and tablets can't pick a whole folder or drag files in: they get the .zip flow
+    // (iPadOS Safari can't either, even with a mouse, hence the user-agent check)
+    const IS_TOUCH = matchMedia('(hover: none) and (pointer: coarse)').matches || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+      || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+    function fmtSize(bytes) {
+      if (!bytes) return '0 MB';
+      if (bytes >= 1024 ** 3) return (bytes / 1024 ** 3).toFixed(2).replace('.', ',') + ' GB';
+      if (bytes >= 1024 ** 2) return Math.round(bytes / 1024 ** 2) + ' MB';
+      return Math.max(1, Math.round(bytes / 1024)) + ' KB';
+    }
+
+    function channelOptions(selected) {
+      if (!channels.length) return '<option value="">Cadastre um canal primeiro</option>';
+      return '<option value="">Escolha o canal…</option>' + channels.map(c =>
+        `<option value="${c.id}" ${c.id === selected ? 'selected' : ''}>${escapeHtml(c.name)}${c.username ? ' (@' + escapeHtml(c.username.replace(/^@/, '')) + ')' : ''}</option>`).join('');
+    }
+
+    async function loadInfo() {
+      try { info = await apiFetch('/courses/info'); } catch (_) {}
+      // Telegram states its limits in MB (50 MB, 2000 MB)
+      const limit = info.upload_limit >= 1900 * 1024 * 1024 ? '2 GB' : fmtSize(info.upload_limit);
+      document.getElementById('limit-hint').innerHTML = info.local_api
+        ? `Vídeos, PDFs, áudios e imagens de até <b>${limit}</b> cada (servidor Bot API local).`
+        : `Vídeos, PDFs, áudios e imagens de até <b>${limit}</b> cada. Para aulas maiores (até 2 GB), configure o servidor Bot API local em <a href="#" onclick="event.preventDefault(); openModal('bot-modal'); document.querySelector('#bot-modal details').open = true" style="color:var(--accent)">Configuração do bot</a>.`;
+      const row = document.getElementById('import-row');
+      const hint = document.getElementById('import-hint');
+      if (info.import_folders && info.import_folders.length) {
+        row.style.display = '';
+        document.getElementById('import-folder').innerHTML = info.import_folders.map(f => `<option value="${escapeHtml(f)}">${escapeHtml(f)}</option>`).join('');
+        hint.textContent = `Pastas encontradas em ${info.import_dir}`;
+      } else {
+        row.style.display = 'none';
+        hint.textContent = info.import_dir ? `Curso muito grande para enviar pelo navegador? Copie a pasta para ${info.import_dir} no servidor e ela aparece aqui.` : '';
+      }
+    }
+
+    // Called by app.js after the Bot API server URL changes
+    function onApiUrlSaved() {
+      loadInfo().then(() => { if (course) renderDetail(); });
+    }
+
+    async function loadChannels() {
+      try { channels = await apiFetch('/channels'); } catch (_) { channels = []; }
+    }
+
+    // ── List ──────────────────────────────────────────────────────────────
+    async function loadList() {
+      const tbody = document.getElementById('courses-tbody');
+      let rows;
+      try { rows = await apiFetch('/courses'); } catch (e) { tbody.innerHTML = `<tr><td colspan="5" class="empty-state-desc">${escapeHtml(e.message)}</td></tr>`; return; }
+      if (!rows.length) {
+        tbody.innerHTML = `<tr><td colspan="5" class="empty-state">
+          <div class="empty-state-icon">🎓</div>
+          <div class="empty-state-title">Nenhum curso ainda</div>
+          <div class="empty-state-desc" style="max-width:460px; margin:0 auto 16px">Escolha a pasta do curso e o Disparos do Mestre publica tudo no canal: um cabeçalho por módulo, as aulas em ordem com hashtags e um sumário fixado com link para cada aula.</div>
+          <button class="btn btn-primary" onclick="openNewCourse()">➕ Criar primeiro curso</button>
+        </td></tr>`;
+        labelTableCells(document.getElementById('courses-table'));
+        return;
+      }
+      tbody.innerHTML = rows.map(c => {
+        const pct = c.lesson_count ? Math.round(c.sent_count / c.lesson_count * 100) : 0;
+        return `<tr>
+          <td><a href="#curso=${c.id}" class="cell-title" style="color:inherit; text-decoration:none">${escapeHtml(c.name)}</a>
+            <div class="tree-meta">${c.module_count} módulos · ${c.lesson_count} aulas · ${fmtSize(c.total_size)}</div></td>
+          <td>${c.channel_name ? escapeHtml(c.channel_name) : '<span style="color:var(--text-muted)">—</span>'}</td>
+          <td class="cell-progress">
+            <div class="progress"><div class="progress-bar" style="width:${pct}%"></div></div>
+            <div class="progress-label"><span>${c.sent_count}/${c.lesson_count} aulas</span>${c.failed_count ? `<span style="color:var(--danger)">${c.failed_count} ${c.failed_count === 1 ? 'falha' : 'falhas'}</span>` : ''}</div>
+          </td>
+          <td>${statusBadge(c.status)}</td>
+          <td class="cell-actions"><div class="row-actions">
+            <a class="btn btn-sm btn-secondary" href="#curso=${c.id}">📂 Abrir</a>
+            <button class="btn btn-sm btn-ghost btn-danger-ghost" onclick="deleteCourse('${c.id}')" title="Excluir curso" aria-label="Excluir curso">🗑️</button>
+          </div></td>
+        </tr>`;
+      }).join('');
+      labelTableCells(document.getElementById('courses-table'));
+      schedulePoll(rows.some(c => c.status === 'running') ? 5000 : 0, loadList);
+    }
+
+    function openNewCourse() {
+      document.getElementById('n-name').value = '';
+      document.getElementById('n-channel').innerHTML = channelOptions(channels.length === 1 ? channels[0].id : '');
+      openModal('new-modal');
+    }
+
+    async function createCourse() {
+      const name = document.getElementById('n-name').value.trim();
+      if (!name) return toast('Dê um nome ao curso', 'warning');
+      try {
+        const c = await apiPost('/courses', { name, channel_id: document.getElementById('n-channel').value });
+        closeModal('new-modal');
+        location.hash = `curso=${c.id}`;
+      } catch (e) { toast(e.message, 'error'); }
+    }
+
+    // Two ways out: remove only from the panel, or also delete what was posted to the channel
+    function deleteCourse(id) {
+      const overlay = document.createElement('div');
+      overlay.className = 'modal-overlay open';
+      overlay.style.zIndex = '9999';
+      overlay.innerHTML = `
+        <div class="modal" role="dialog" aria-modal="true" style="max-width:460px">
+          <div class="modal-header">
+            <div class="modal-title">Excluir curso</div>
+            <button class="btn-icon" aria-label="Fechar" data-cancel>✖</button>
+          </div>
+          <div class="modal-body">
+            <p style="color:var(--text-secondary)">Os arquivos do curso são apagados do servidor. As aulas já publicadas podem continuar no canal ou ser apagadas de lá também.</p>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-secondary" data-cancel>Cancelar</button>
+            <button class="btn btn-secondary" data-choice="0">Manter no canal</button>
+            <button class="btn btn-danger" data-choice="1">Apagar do canal também</button>
+          </div>
+        </div>`;
+      overlay.querySelectorAll('[data-cancel]').forEach(b => b.addEventListener('click', () => overlay.remove()));
+      overlay.querySelectorAll('[data-choice]').forEach(b => b.addEventListener('click', async () => {
+        overlay.remove();
+        const fromTelegram = b.dataset.choice === '1';
+        try {
+          const res = await apiDelete(`/courses/${id}${fromTelegram ? '?telegram=1' : ''}`);
+          if (res.delete_errors) toast(`Curso excluído, mas ${res.delete_errors} mensagens não puderam ser apagadas do canal`, 'warning');
+          else toast(fromTelegram ? 'Curso excluído e apagado do canal' : 'Curso excluído');
+          if (location.hash) location.hash = ''; else loadList();
+        } catch (e) { toast(e.message, 'error'); }
+      }));
+      document.body.appendChild(overlay);
+      overlay.querySelector('[data-choice="0"]').focus();
+    }
+
+    // ── Detail ────────────────────────────────────────────────────────────
+    async function openCourse(id, { keepSettings = false } = {}) {
+      try {
+        course = await apiFetch(`/courses/${id}`);
+      } catch (e) {
+        toast(e.message, 'error');
+        location.hash = '';
+        return;
+      }
+      if (!keepSettings) {
+        fillSettings();
+        collapsed.clear();
+        // Empty course: start where files are added; otherwise on the lesson list
+        setTab(course.items.length ? 'order' : 'files');
+      }
+      renderDetail();
+      schedulePoll(course.status === 'running' ? 3000 : 0, () => openCourse(id, { keepSettings: true }));
+    }
+
+    function fillSettings() {
+      document.getElementById('s-name').value = course.name;
+      document.getElementById('s-channel').innerHTML = channelOptions(course.channel_id);
+      document.getElementById('s-description').value = course.description || '';
+      document.getElementById('s-template').value = course.caption_template || info.default_template || '';
+      document.getElementById('s-prefix').value = course.hashtag_prefix || '';
+      document.getElementById('s-signature').value = course.signature || '';
+      document.getElementById('s-delay').value = String(course.delay_seconds || 3);
+      document.getElementById('s-index').checked = !!course.send_index;
+      document.getElementById('s-pin').checked = !!course.pin_index;
+      document.getElementById('s-protect').checked = !!course.protect_content;
+      document.getElementById('s-delete').checked = !!course.delete_after_upload;
+      settingsDirty = false;
+      updatePreview();
+    }
+
+    function renderDetail() {
+      const c = course;
+      document.getElementById('page-title').textContent = c.name;
+      document.getElementById('d-name').textContent = c.name;
+      document.getElementById('d-status').innerHTML = statusBadge(c.status);
+
+      const lessons = c.items.filter(i => i.kind === 'lesson');
+      const active = lessons.filter(i => i.status !== 'skipped');
+      const sent = active.filter(i => i.status === 'sent');
+      const failed = active.filter(i => i.status === 'failed');
+      const modules = c.items.filter(i => i.kind === 'module' && i.depth === 1).length;
+      const sections = c.items.filter(i => i.kind === 'module' && i.depth > 1).length;
+      const totalSize = active.reduce((s, i) => s + (i.file_size || 0), 0);
+      const sentSize = sent.reduce((s, i) => s + (i.file_size || 0), 0);
+      const tooBig = active.filter(i => i.status !== 'sent' && i.file_size > info.upload_limit);
+
+      document.getElementById('d-meta').innerHTML = [
+        c.channel_name ? `📡 ${escapeHtml(c.channel_name)}` : '<span style="color:var(--warning)">Sem canal de destino</span>',
+        `${modules} ${modules === 1 ? 'módulo' : 'módulos'}`,
+        ...(sections ? [`${sections} ${sections === 1 ? 'seção' : 'seções'}`] : []),
+        `${active.length} ${active.length === 1 ? 'aula' : 'aulas'}`,
+      ].join(' · ');
+      const pct = active.length ? Math.round(sent.length / active.length * 100) : 0;
+      document.getElementById('d-progress').style.width = pct + '%';
+      document.getElementById('d-progress-text').textContent = `${sent.length} de ${active.length} aulas enviadas${failed.length ? ` · ${failed.length} com falha` : ''}`;
+      document.getElementById('d-progress-size').textContent = `${fmtSize(sentSize)} de ${fmtSize(totalSize)}`;
+
+      const pending = active.filter(i => i.status === 'pending' || i.status === 'sending').length;
+      const actions = [];
+      if (c.status === 'running') {
+        actions.push(`<button class="btn btn-secondary" onclick="pauseCourse()">⏸️ Pausar</button>`);
+      } else if (pending) {
+        const label = sent.length ? '▶️ Continuar envio' : '🚀 Iniciar envio';
+        actions.push(`<button class="btn btn-success" onclick="startCourse()" ${uploading ? 'disabled title="Espere os arquivos terminarem de subir"' : ''}>${label}</button>`);
+      }
+      if (failed.length && c.status !== 'running') actions.push(`<button class="btn btn-secondary" onclick="retryFailed()">🔁 Tentar falhas (${failed.length})</button>`);
+      if (sent.length && c.status !== 'running') actions.push(`<button class="btn btn-secondary" onclick="resendIndex(this)">📚 ${c.index_msg_ids ? 'Atualizar' : 'Enviar'} sumário</button>`);
+      if (c.index_link) actions.push(`<a class="btn btn-ghost" href="${escapeHtml(c.index_link)}" target="_blank" rel="noopener">Ver no Telegram ↗</a>`);
+      document.getElementById('d-actions').innerHTML = actions.join('');
+
+      const alerts = [];
+      if (c.last_error) alerts.push(`<div class="course-alert ${c.status === 'paused' ? 'danger' : ''}">${c.status === 'paused' ? '⏸️ Envio pausado: ' : '⚠️ '}${escapeHtml(friendlyError(c.last_error))}</div>`);
+      if (tooBig.length) alerts.push(`<div class="course-alert">⚠️ ${tooBig.length} ${tooBig.length === 1 ? 'arquivo passa' : 'arquivos passam'} do limite de ${fmtSize(info.upload_limit)} por arquivo e ${tooBig.length === 1 ? 'vai falhar' : 'vão falhar'}.${info.local_api ? '' : ' Configure o servidor Bot API local (Configuração do bot → Avançado) para enviar até 2 GB.'}</div>`);
+      if (c.status === 'running') alerts.push(`<div class="course-alert" style="background:var(--accent-glow); border-color:rgba(91,106,240,0.35)">📤 Enviando… você pode fechar esta página, o envio continua no servidor.</div>`);
+      document.getElementById('d-alerts').innerHTML = alerts.join('');
+
+      document.getElementById('tab-count').textContent = active.length ? `(${active.length})` : '';
+      renderDropzone();
+      renderTree();
+      updatePreview();
+    }
+
+    function renderTree() {
+      const tree = document.getElementById('tree');
+      const items = course.items;
+      if (!items.length) {
+        tree.innerHTML = `<div class="empty-state" style="padding:24px 8px">
+          <div class="empty-state-icon">📁</div>
+          <div class="empty-state-title">Nenhum arquivo</div>
+          <div class="empty-state-desc">${IS_TOUCH ? 'Envie o curso em .zip na aba Arquivos.' : 'Escolha a pasta do curso acima.'} Ex: <code>Módulo 1/Parte A/Aula 1.mp4</code></div></div>`;
+        return;
+      }
+      const editable = course.status !== 'running';
+      // One box per top-level module (lessons at the course root get a box of their own);
+      // subfolders are rows inside it, indented by depth
+      const boxes = [];
+      for (const item of items) {
+        if (item.kind === 'module' && item.depth === 1) boxes.push({ header: item, rows: [] });
+        else if (item.depth === 0 && (!boxes.length || boxes[boxes.length - 1].header)) boxes.push({ header: null, rows: [item] });
+        else boxes[boxes.length - 1].rows.push(item);
+      }
+      tree.innerHTML = boxes.map(box => {
+        const rows = box.rows.map(item => item.kind === 'module' ? subRow(item) : lessonRow(item, editable)).join('');
+        if (!box.header) return `<div class="tree-module">${rows}</div>`;
+        const h = box.header;
+        const lessons = box.rows.filter(i => i.kind === 'lesson' && i.status !== 'skipped');
+        const sent = lessons.filter(i => i.status === 'sent').length;
+        return `<details class="tree-module" data-key="${escapeHtml(h.module_key)}" ${collapsed.has(h.module_key) ? '' : 'open'}>
+          <summary class="tree-module-head">
+            <span class="tree-caret">▶</span>
+            <span>📂</span>
+            <button type="button" class="tree-module-title btn-reset" onclick="event.preventDefault(); renameItem('${h.id}')" title="Renomear módulo">${escapeHtml(h.title)}</button>
+            <span class="tree-count">${sent}/${lessons.length}</span>
+            <span class="tag-chip">#${escapeHtml(h.tag)}</span>
+            ${h.status === 'sent' ? (h.link ? `<a href="${escapeHtml(h.link)}" target="_blank" rel="noopener" title="Ver no Telegram" onclick="event.stopPropagation()">✅</a>` : '✅') : ''}
+          </summary>
+          ${rows}
+        </details>`;
+      }).join('');
+      tree.querySelectorAll('details.tree-module').forEach(d => d.addEventListener('toggle', () => {
+        if (d.open) collapsed.delete(d.dataset.key); else collapsed.add(d.dataset.key);
+      }));
+    }
+
+    const indent = depth => `padding-left:${14 + Math.max(0, depth - 1) * (IS_TOUCH ? 12 : 18)}px`;
+
+    function subRow(h) {
+      return `<div class="tree-sub" style="${indent(h.depth - 1)}">
+        <span>📁</span>
+        <button type="button" class="tree-title btn-reset" onclick="renameItem('${h.id}')" title="Renomear seção">${escapeHtml(h.title)}</button>
+        <span class="tag-chip">#${escapeHtml(h.tag)}</span>
+        ${h.status === 'sent' ? '✅' : ''}
+      </div>`;
+    }
+
+    function lessonRow(l, editable) {
+      const statusInfo = {
+        pending: '', sending: statusBadge('sending'), sent: statusBadge('sent'),
+        failed: statusBadge('failed'), skipped: statusBadge('skipped'),
+      }[l.status] || '';
+      const tooBig = l.status !== 'sent' && l.file_size > info.upload_limit;
+      const canSkip = editable && (l.status === 'pending' || l.status === 'failed' || l.status === 'skipped');
+      return `<div class="tree-row ${l.status === 'skipped' ? 'skipped' : ''}" style="${indent(l.depth)}">
+        <span class="tree-icon" title="${l.media_type}">${TYPE_ICONS[l.media_type] || '📄'}</span>
+        <div class="tree-main">
+          <button type="button" class="tree-title btn-reset" onclick="renameItem('${l.id}')" title="Renomear aula">${escapeHtml(l.title)}</button>
+          <div class="tree-meta">
+            <span class="${tooBig ? 'too-big' : ''}">${fmtSize(l.file_size)}${tooBig ? ' · grande demais' : ''}</span>
+            ${l.tag ? `<span class="tag-chip">#${escapeHtml(l.tag)}</span>` : ''}
+            <span title="${escapeHtml(l.rel_path || '')}">${escapeHtml(trunc((l.rel_path || '').split('/').pop(), 50))}</span>
+          </div>
+          ${l.status === 'failed' && l.error_msg ? `<div class="tree-error">${escapeHtml(friendlyError(l.error_msg))}</div>` : ''}
+        </div>
+        <div class="tree-actions">
+          ${statusInfo}
+          ${l.link ? `<a class="btn btn-ghost btn-sm" href="${escapeHtml(l.link)}" target="_blank" rel="noopener" title="Ver no Telegram" aria-label="Ver no Telegram">↗<span class="m-label"> Ver</span></a>` : ''}
+          ${canSkip && l.status !== 'skipped' ? `<button class="btn btn-ghost btn-sm" onclick="moveItem('${l.id}')" title="Mudar de pasta" aria-label="Mudar de pasta">📁<span class="m-label"> Mover</span></button>` : ''}
+          ${canSkip ? `<button class="btn btn-ghost btn-sm" onclick="toggleSkip('${l.id}', ${l.status !== 'skipped'})" title="${l.status === 'skipped' ? 'Voltar a enviar esta aula' : 'Não enviar esta aula'}" aria-label="${l.status === 'skipped' ? 'Incluir aula' : 'Pular aula'}">${l.status === 'skipped' ? '↩️<span class="m-label"> Incluir</span>' : '⏭️<span class="m-label"> Pular</span>'}</button>` : ''}
+          ${editable && l.status !== 'sent' ? `<button class="btn btn-ghost btn-sm btn-danger-ghost" onclick="removeItem('${l.id}')" title="Remover arquivo" aria-label="Remover arquivo">✖<span class="m-label"> Remover</span></button>` : ''}
+        </div>
+      </div>`;
+    }
+
+    function schedulePoll(ms, fn) {
+      clearTimeout(pollTimer);
+      if (ms) pollTimer = setTimeout(fn, ms);
+    }
+
+    async function refresh() {
+      if (course) await openCourse(course.id, { keepSettings: true });
+    }
+
+    async function renameItem(itemId) {
+      const item = course.items.find(i => i.id === itemId);
+      const values = await showPrompt(item.kind === 'module' ? 'Renomear módulo' : 'Renomear aula', [{ label: 'Título', value: item.title }], 'Salvar');
+      if (!values || !values[0] || values[0] === item.title) return;
+      try {
+        await apiPut(`/courses/${course.id}/items/${itemId}`, { title: values[0] });
+        if (item.status === 'sent') toast('Título salvo. A mensagem já publicada não muda; o sumário usa o novo título.', 'info');
+        refresh();
+      } catch (e) { toast(e.message, 'error'); }
+    }
+
+    async function moveItem(itemId) {
+      const item = course.items.find(i => i.id === itemId);
+      const folder = await chooseFolder(`Mover "${item.title}"`, item.module_key.split(' / ').join('/'), 'Mover');
+      if (folder === null) return;
+      try { await apiPut(`/courses/${course.id}/items/${itemId}`, { folder }); refresh(); }
+      catch (e) { toast(e.message, 'error'); }
+    }
+
+    // Folders of the course as "Módulo 1/Parte A", from the module headers
+    function courseFolders() {
+      return (course?.items || []).filter(i => i.kind === 'module').map(i => ({ path: i.module_key.split(' / ').join('/'), depth: i.depth }));
+    }
+
+    // Asks for a destination folder: an existing one, optionally plus a new subfolder. Resolves to the path or null.
+    function chooseFolder(title, current = '', confirmLabel = 'Continuar') {
+      return new Promise(resolve => {
+        const folders = courseFolders();
+        const overlay = document.createElement('div');
+        overlay.className = 'modal-overlay open';
+        overlay.style.zIndex = '9999';
+        overlay.innerHTML = `
+          <form class="modal folder-dialog" role="dialog" aria-modal="true" style="max-width:460px">
+            <div class="modal-header">
+              <div class="modal-title">${escapeHtml(title)}</div>
+              <button type="button" class="btn-icon" aria-label="Fechar" data-cancel>✖</button>
+            </div>
+            <div class="modal-body">
+              <label class="form-label" for="folder-pick">Pasta</label>
+              <select id="folder-pick" class="form-control">
+                <option value="">📚 Raiz do curso (sem módulo)</option>
+                ${folders.map(f => `<option value="${escapeHtml(f.path)}" ${f.path === current ? 'selected' : ''}>${'\u2003'.repeat(f.depth - 1)}${f.depth === 1 ? '📂' : '📁'} ${escapeHtml(f.path.split('/').pop())}</option>`).join('')}
+              </select>
+              <label class="form-label" for="folder-new">Nova pasta dentro dela <span style="color:var(--text-muted); font-weight:400">(opcional)</span></label>
+              <input id="folder-new" class="form-control" placeholder="Ex: Módulo 3 ou Parte A" maxlength="120">
+              <div class="form-hint">Use / para criar mais níveis: <code>Módulo 3/Parte A</code></div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-cancel>Cancelar</button>
+              <button type="submit" class="btn btn-primary">${escapeHtml(confirmLabel)}</button>
+            </div>
+          </form>`;
+        const finish = value => { overlay.remove(); resolve(value); };
+        overlay.querySelectorAll('[data-cancel]').forEach(b => b.addEventListener('click', () => finish(null)));
+        overlay.addEventListener('click', e => { if (e.target === overlay) finish(null); });
+        overlay.querySelector('form').addEventListener('submit', e => {
+          e.preventDefault();
+          const base = overlay.querySelector('#folder-pick').value;
+          const extra = overlay.querySelector('#folder-new').value.split('/').map(p => p.trim()).filter(Boolean).join('/');
+          finish([base, extra].filter(Boolean).join('/'));
+        });
+        document.body.appendChild(overlay);
+        overlay.querySelector(IS_TOUCH ? '#folder-pick' : '#folder-new').focus();
+      });
+    }
+
+    async function toggleSkip(itemId, skip) {
+      try { await apiPut(`/courses/${course.id}/items/${itemId}`, { skip }); refresh(); }
+      catch (e) { toast(e.message, 'error'); }
+    }
+
+    async function removeItem(itemId) {
+      try { await apiDelete(`/courses/${course.id}/items/${itemId}`); refresh(); }
+      catch (e) { toast(e.message, 'error'); }
+    }
+
+    // ── Settings ──────────────────────────────────────────────────────────
+    function collectSettings() {
+      return {
+        name: document.getElementById('s-name').value.trim(),
+        channel_id: document.getElementById('s-channel').value,
+        description: document.getElementById('s-description').value,
+        caption_template: document.getElementById('s-template').value,
+        hashtag_prefix: document.getElementById('s-prefix').value.trim(),
+        signature: document.getElementById('s-signature').value.trim(),
+        delay_seconds: Number(document.getElementById('s-delay').value),
+        send_index: document.getElementById('s-index').checked,
+        pin_index: document.getElementById('s-pin').checked,
+        protect_content: document.getElementById('s-protect').checked,
+        delete_after_upload: document.getElementById('s-delete').checked,
+      };
+    }
+
+    async function saveSettings({ quiet = false } = {}) {
+      const data = collectSettings();
+      if (!data.name) { toast('Dê um nome ao curso', 'warning'); return false; }
+      try {
+        await apiPut(`/courses/${course.id}`, data);
+        settingsDirty = false;
+        if (!quiet) toast('Configurações salvas');
+        await refresh();
+        return true;
+      } catch (e) { toast(e.message, 'error'); return false; }
+    }
+
+    // Mirrors renderTemplate/tagsFor in backend/courses.js so the preview matches what Telegram receives
+    function renderTemplate(template, vars) {
+      return template.split('\n').map(line => {
+        let used = 0, filled = 0;
+        let out = line.replace(/(#?)\{(\w+)\}/g, (m, hash, name) => {
+          if (!(name in vars)) return m;
+          used++;
+          const v = vars[name];
+          if (v === '' || v == null) return '';
+          filled++;
+          return hash + escapeHtml(String(v));
+        });
+        if (used > 0 && filled === 0) return null;
+        const seen = new Set();
+        out = out.replace(/(^|\s)(#[\p{L}\p{N}_]+)/gu, (m, space, tag) => (seen.has(tag) ? space : (seen.add(tag), m)));
+        return used > filled || out !== line ? out.replace(/ {2,}/g, ' ').trim() : out.replace(/\s+$/, '');
+      }).filter(l => l !== null).join('\n').replace(/\n{3,}/g, '\n\n').trim();
+    }
+
+    const pad2 = n => String(n).padStart(2, '0');
+    const folderTagOf = (prefix, numPath) => numPath ? prefix + numPath.split('.').map((n, i) => (i ? 'S' : 'M') + pad2(n)).join('') : '';
+
+    function sampleVars() {
+      const prefixRaw = document.getElementById('s-prefix').value.replace(/[^\p{L}\p{N}_]/gu, '');
+      const p = prefixRaw ? prefixRaw + '_' : '';
+      const items = course?.items || [];
+      const lessons = items.filter(i => i.kind === 'lesson' && i.status !== 'skipped');
+      // Prefer a lesson inside a subfolder: it shows every variable filled in
+      const first = lessons.find(l => l.depth >= 2) || lessons.find(l => l.depth === 1) || lessons[0]
+        || { title: 'Boas-vindas', module_key: 'Módulo 1', num_path: '1', lesson_num: 1, rel_path: 'Módulo 1/01 Boas-vindas.mp4', depth: 1 };
+      const dirs = first.module_key ? first.module_key.split(' / ') : [];
+      const titles = dirs.map((d, i) => {
+        const h = items.find(x => x.kind === 'module' && x.module_key === dirs.slice(0, i + 1).join(' / '));
+        return h ? h.title : d;
+      });
+      const numPath = first.num_path || '';
+      const folderTag = folderTagOf(p, numPath);
+      return {
+        vars: {
+          curso: document.getElementById('s-name').value || 'Meu curso',
+          modulo: titles[0] || '', pasta: titles[titles.length - 1] || '', caminho: titles.join(' › '),
+          aula: first.title, n_modulo: numPath ? numPath.split('.')[0] : '', n_aula: first.lesson_num || 1,
+          n: (lessons.indexOf(first) + 1) || 1, total: lessons.length || 1,
+          tag: `${folderTag || p}A${pad2(first.lesson_num || 1)}`, tag_modulo: folderTagOf(p, numPath.split('.')[0]), tag_pasta: folderTag,
+          arquivo: (first.rel_path || '').split('/').pop(),
+        },
+        title: first.title,
+      };
+    }
+
+    function updatePreview() {
+      if (!course) return;
+      const { vars, title } = sampleVars();
+      let html = renderTemplate(document.getElementById('s-template').value || info.default_template || '', vars);
+      const sig = document.getElementById('s-signature').value.trim();
+      if (sig) html += `\n\n${escapeHtml(sig)}`;
+      document.getElementById('caption-preview').innerHTML = telegramHtmlToSafeHtml(html) || '<span style="color:var(--text-muted)">(sem legenda)</span>';
+      const len = html.replace(/<[^>]*>/g, '').length;
+      document.getElementById('preview-label').textContent = `Prévia: ${trunc(title, 40)} · ${len}/1024 caracteres`;
+      document.getElementById('prefix-hint').textContent = [...new Set([vars.tag_modulo || 'M01', vars.tag_pasta, vars.tag])].filter(Boolean).map(t => '#' + t).join(' ');
+    }
+
+    document.getElementById('var-chips').innerHTML = VARIABLES.map(([v, label]) =>
+      `<button type="button" title="${label}" data-var="${v}">{${v}}</button>`).join('');
+    document.getElementById('var-chips').addEventListener('click', e => {
+      const btn = e.target.closest('[data-var]');
+      if (!btn) return;
+      const ta = document.getElementById('s-template');
+      const text = `{${btn.dataset.var}}`;
+      const start = ta.selectionStart ?? ta.value.length;
+      ta.setRangeText(text, start, ta.selectionEnd ?? start, 'end');
+      ta.focus();
+      settingsDirty = true;
+      updatePreview();
+    });
+    document.getElementById('settings-form').addEventListener('input', () => { settingsDirty = true; updatePreview(); });
+    document.getElementById('settings-form').addEventListener('change', () => { settingsDirty = true; });
+
+    // ── Sending ───────────────────────────────────────────────────────────
+    async function startCourse() {
+      if (settingsDirty && !(await saveSettings({ quiet: true }))) return;
+      if (!course.channel_id) return toast('Escolha o canal de destino nas configurações', 'warning');
+      try {
+        await apiPost(`/courses/${course.id}/start`, {});
+        toast('Envio iniciado');
+        refresh();
+      } catch (e) { toast(e.message, 'error'); }
+    }
+
+    async function pauseCourse() {
+      try {
+        await apiPost(`/courses/${course.id}/pause`, {});
+        toast('Pausando: a aula que está subindo termina primeiro', 'info');
+        refresh();
+      } catch (e) { toast(e.message, 'error'); }
+    }
+
+    async function retryFailed() {
+      try {
+        const res = await apiPost(`/courses/${course.id}/retry`, {});
+        toast(`${res.retried} aulas voltaram para a fila`);
+        refresh();
+      } catch (e) { toast(e.message, 'error'); }
+    }
+
+    async function resendIndex(btn) {
+      if (btn) btn.disabled = true;
+      try {
+        const res = await apiPost(`/courses/${course.id}/index`, {});
+        toast(res.warning || 'Sumário publicado', res.warning ? 'warning' : 'success');
+        refresh();
+      } catch (e) { toast(friendlyError(e.message), 'error'); }
+      if (btn) btn.disabled = false;
+    }
+
+    // ── Uploads ───────────────────────────────────────────────────────────
+    const KEEP_OPEN = '<div class="form-hint" style="margin-top:6px">Mantenha esta tela aberta até terminar.</div>';
+
+    // Phones lock the screen mid-upload and the browser drops the connection; ask to stay awake
+    let wakeLock = null;
+    async function keepScreenOn(on) {
+      try {
+        if (on && 'wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen');
+        else if (!on && wakeLock) { await wakeLock.release(); wakeLock = null; }
+      } catch (_) {}
+    }
+
+    function putFile(file, relPath, onProgress, url) {
+      return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('PUT', url || `${API}/courses/${course.id}/files?path=${encodeURIComponent(relPath)}`);
+        xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+        xhr.upload.onprogress = e => { if (e.lengthComputable) onProgress(e.loaded); };
+        xhr.onload = () => {
+          let data = {};
+          try { data = JSON.parse(xhr.responseText); } catch (_) {}
+          if (xhr.status >= 200 && xhr.status < 300) resolve(data);
+          else reject(new Error(data.error || `Erro ${xhr.status}`));
+        };
+        xhr.onerror = () => reject(new Error('Falha de conexão'));
+        xhr.send(file);
+      });
+    }
+
+    // entries: [{ file, rel }]
+    async function uploadEntries(entries) {
+      if (!course) return;
+      if (course.status === 'running') return toast('Pause o envio antes de adicionar arquivos', 'warning');
+      entries = entries.filter(e => !e.rel.split('/').some(part => IGNORED.test(part)));
+      const huge = entries.filter(e => e.file.size > HARD_LIMIT);
+      entries = entries.filter(e => e.file.size <= HARD_LIMIT);
+      if (huge.length) toast(`${huge.length} arquivo(s) acima de 2 GB ignorado(s): o Telegram não aceita arquivos desse tamanho de bots`, 'warning');
+      if (!entries.length) return;
+      const overLimit = entries.filter(e => e.file.size > info.upload_limit).length;
+      if (overLimit) toast(`${overLimit} arquivo(s) passam de ${fmtSize(info.upload_limit)} e só vão para o Telegram com o servidor Bot API local`, 'warning');
+
+      uploading = true;
+      renderDetail();
+      await keepScreenOn(true);
+      const status = document.getElementById('upload-status');
+      status.style.display = '';
+      const total = entries.reduce((s, e) => s + e.file.size, 0);
+      let done = 0;
+      const errors = [];
+      for (let i = 0; i < entries.length; i++) {
+        const { file, rel } = entries[i];
+        const draw = loaded => {
+          const pct = total ? Math.round((done + loaded) / total * 100) : 100;
+          status.innerHTML = `Enviando ${i + 1} de ${entries.length}: <b>${escapeHtml(trunc(rel, 60))}</b> · ${fmtSize(done + loaded)} de ${fmtSize(total)}
+            <div class="progress"><div class="progress-bar" style="width:${pct}%"></div></div>${KEEP_OPEN}`;
+        };
+        draw(0);
+        try {
+          await putFile(file, rel, draw);
+        } catch (e) {
+          errors.push(`${rel}: ${e.message}`);
+        }
+        done += file.size;
+      }
+      uploading = false;
+      keepScreenOn(false);
+      try { await apiPost(`/courses/${course.id}/rebuild`, {}); } catch (e) { errors.push(e.message); }
+      status.innerHTML = errors.length
+        ? `<span style="color:var(--danger)">${errors.length} arquivo(s) com erro:</span><br>${errors.slice(0, 5).map(escapeHtml).join('<br>')}`
+        : `✅ ${entries.length} arquivo(s) adicionados (${fmtSize(total)})`;
+      if (!errors.length) setTimeout(() => { status.style.display = 'none'; }, 6000);
+      await refresh();
+      if (!errors.length) setTab('order');
+    }
+
+    // From the folder picker, "Curso/Módulo 1/Aula.mp4": the picked folder itself isn't a module
+    function fromPicker(files, isFolder) {
+      return [...files].map(file => {
+        const rel = isFolder && file.webkitRelativePath ? file.webkitRelativePath.split('/').slice(1).join('/') : file.name;
+        return { file, rel: rel || file.name };
+      });
+    }
+
+    document.getElementById('pick-folder').addEventListener('change', e => { uploadEntries(fromPicker(e.target.files, true)); e.target.value = ''; });
+    // Loose files: ask which folder they belong to, so the structure can be built without a folder picker
+    document.getElementById('pick-files').addEventListener('change', async e => {
+      const files = [...e.target.files];
+      e.target.value = '';
+      if (!files.length) return;
+      const folder = await chooseFolder(files.length === 1 ? 'Em qual pasta fica esta aula?' : `Em qual pasta ficam estas ${files.length} aulas?`, '', 'Enviar');
+      if (folder === null) return;
+      uploadEntries(files.map(file => ({ file, rel: folder ? `${folder}/${file.name}` : file.name })));
+    });
+    document.getElementById('pick-zip').addEventListener('change', e => {
+      const file = e.target.files[0];
+      e.target.value = '';
+      if (file) uploadZip(file);
+    });
+
+    async function uploadZip(file) {
+      if (course.status === 'running') return toast('Pause o envio antes de adicionar arquivos', 'warning');
+      if (!/\.zip$/i.test(file.name)) return toast('Escolha um arquivo .zip', 'warning');
+      uploading = true;
+      renderDetail();
+      await keepScreenOn(true);
+      const status = document.getElementById('upload-status');
+      status.style.display = '';
+      const draw = loaded => {
+        const pct = Math.round(loaded / file.size * 100);
+        status.innerHTML = (pct < 100
+          ? `Enviando <b>${escapeHtml(trunc(file.name, 50))}</b> · ${fmtSize(loaded)} de ${fmtSize(file.size)}`
+          : `Descompactando <b>${escapeHtml(trunc(file.name, 50))}</b>…`) +
+          `<div class="progress"><div class="progress-bar" style="width:${pct}%"></div></div>${KEEP_OPEN}`;
+      };
+      draw(0);
+      try {
+        const res = await putFile(file, null, draw, `${API}/courses/${course.id}/zip`);
+        status.innerHTML = `✅ ${res.added} arquivo(s) extraídos do .zip` +
+          (res.skipped && res.skipped.length ? `<br><span style="color:var(--warning)">${res.skipped.length} ignorado(s): ${res.skipped.slice(0, 3).map(escapeHtml).join('; ')}</span>` : '');
+        await refresh();
+        setTab('order');
+        setTimeout(() => { status.style.display = 'none'; }, 8000);
+      } catch (e) {
+        status.innerHTML = `<span style="color:var(--danger)">Erro no .zip: ${escapeHtml(e.message)}</span>`;
+      } finally {
+        uploading = false;
+        keepScreenOn(false);
+        renderDetail();
+      }
+    }
+
+    // Upload buttons differ by device: phones can't pick folders, so the .zip leads there
+    function renderDropzone() {
+      const btn = (cls, target, label) => `<button type="button" class="btn ${cls}" onclick="document.getElementById('${target}').click()">${label}</button>`;
+      document.getElementById('dropzone-title').textContent = IS_TOUCH ? 'Adicione o curso' : 'Arraste a pasta do curso (ou o .zip) para cá';
+      document.getElementById('dropzone-actions').innerHTML = IS_TOUCH
+        ? btn('btn-primary', 'pick-zip', '🗜️ Enviar curso (.zip)') + btn('btn-secondary', 'pick-files', '📄 Adicionar aulas')
+        : btn('btn-primary', 'pick-folder', '📁 Escolher pasta') + btn('btn-secondary', 'pick-zip', '🗜️ Enviar .zip') + btn('btn-secondary', 'pick-files', '📄 Adicionar arquivos');
+      if (IS_TOUCH) document.getElementById('zip-howto').open = !course || !course.items.length;
+    }
+    renderDropzone();
+
+    function setTab(tab) {
+      activeTab = tab;
+      document.getElementById('course-layout').dataset.tab = tab;
+      document.querySelectorAll('#course-tabs [data-tab]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === tab)));
+    }
+    document.getElementById('course-tabs').addEventListener('click', e => {
+      const b = e.target.closest('[data-tab]');
+      if (b) { setTab(b.dataset.tab); document.querySelector('.main-wrapper').scrollTop = 0; }
+    });
+
+    // Drag and drop, folders included (walked with the File System entries API)
+    function readEntry(entry, prefix) {
+      return new Promise(resolve => {
+        if (entry.isFile) {
+          entry.file(file => resolve([{ file, rel: prefix + file.name }]), () => resolve([]));
+        } else if (entry.isDirectory) {
+          const reader = entry.createReader();
+          const all = [];
+          const readBatch = () => reader.readEntries(async batch => {
+            if (!batch.length) {
+              const nested = await Promise.all(all.map(child => readEntry(child, prefix + entry.name + '/')));
+              resolve(nested.flat());
+            } else {
+              all.push(...batch);
+              readBatch();
+            }
+          }, () => resolve([]));
+          readBatch();
+        } else resolve([]);
+      });
+    }
+
+    const dropzone = document.getElementById('dropzone');
+    ['dragenter', 'dragover'].forEach(ev => dropzone.addEventListener(ev, e => { e.preventDefault(); dropzone.classList.add('over'); }));
+    ['dragleave', 'drop'].forEach(ev => dropzone.addEventListener(ev, () => dropzone.classList.remove('over')));
+    dropzone.addEventListener('drop', async e => {
+      e.preventDefault();
+      const roots = [...e.dataTransfer.items].map(i => i.webkitGetAsEntry && i.webkitGetAsEntry()).filter(Boolean);
+      const dropped = [...e.dataTransfer.files];
+      if (dropped.length === 1 && /\.zip$/i.test(dropped[0].name) && roots.length === 1 && roots[0].isFile) return uploadZip(dropped[0]);
+      let entries = (await Promise.all(roots.map(r => readEntry(r, '')))).flat();
+      // A single dropped folder is the course itself: its subfolders are the modules
+      if (roots.length === 1 && roots[0].isDirectory) {
+        const top = roots[0].name + '/';
+        entries = entries.map(en => ({ ...en, rel: en.rel.startsWith(top) ? en.rel.slice(top.length) : en.rel }));
+      }
+      uploadEntries(entries);
+    });
+
+    async function importFolder() {
+      const folder = document.getElementById('import-folder').value;
+      if (!folder) return;
+      try {
+        const res = await apiPost(`/courses/${course.id}/import`, { folder });
+        toast(`${res.imported} arquivos importados de ${folder}`);
+        refresh();
+      } catch (e) { toast(e.message, 'error'); }
+    }
+
+    // ── Routing ───────────────────────────────────────────────────────────
+    function route() {
+      const match = location.hash.match(/^#curso=([\w-]+)$/);
+      const detail = !!match;
+      document.getElementById('view-list').style.display = detail ? 'none' : '';
+      document.getElementById('view-detail').style.display = detail ? '' : 'none';
+      document.getElementById('btn-back').style.display = detail ? '' : 'none';
+      document.getElementById('btn-new').style.display = detail ? 'none' : '';
+      clearTimeout(pollTimer);
+      if (detail) openCourse(match[1]);
+      else {
+        course = null;
+        document.getElementById('page-title').textContent = 'Cursos';
+        loadList();
+      }
+      document.querySelector('.main-wrapper').scrollTop = 0;
+    }
+
+    window.addEventListener('hashchange', () => {
+      // Leaving the course mid-upload would mix files into the wrong view; stay until it finishes
+      if (uploading && course && location.hash !== `#curso=${course.id}`) {
+        history.replaceState(null, '', `#curso=${course.id}`);
+        return toast('Espere os arquivos terminarem de subir', 'warning');
+      }
+      route();
+    });
+    // Files dropped outside the drop area would make the browser open them
+    ['dragover', 'drop'].forEach(ev => window.addEventListener(ev, e => e.preventDefault()));
+    window.addEventListener('beforeunload', e => {
+      if (uploading || settingsDirty) { e.preventDefault(); e.returnValue = ''; }
+    });
+
+    Promise.all([loadInfo(), loadChannels()]).then(route);
+  </script>
+</body>
+</html>

@@ -280,6 +280,21 @@ function setupBotStatus() {
               Abra o <a href="https://t.me/BotFather" target="_blank" rel="noopener" style="color:var(--accent)">@BotFather</a> no Telegram, crie um bot e cole o token aqui.
             </div>
           </div>
+          <details class="advanced-box">
+            <summary>Avançado: arquivos acima de 50 MB</summary>
+            <div class="form-group">
+              <label class="form-label" for="bot-api-url-input">Servidor Bot API local</label>
+              <div style="display:flex; gap:8px">
+                <input type="url" id="bot-api-url-input" class="form-control" placeholder="http://localhost:8081" autocomplete="off">
+                <button type="button" class="btn btn-secondary" onclick="saveApiUrl()">Salvar</button>
+              </div>
+              <div class="form-hint">
+                O Telegram aceita até 50 MB por arquivo enviado por bot. Com um
+                <a href="https://github.com/tdlib/telegram-bot-api" target="_blank" rel="noopener" style="color:var(--accent)">servidor Bot API local</a>
+                o limite sobe para 2 GB (útil para aulas em vídeo). Deixe vazio para usar o servidor oficial.
+              </div>
+            </div>
+          </details>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" onclick="closeModal('bot-modal')">Cancelar</button>
@@ -309,12 +324,25 @@ async function saveToken() {
   btn.disabled = false;
 }
 
+async function saveApiUrl() {
+  const input = document.getElementById('bot-api-url-input');
+  try {
+    const res = await apiPost('/stats/settings/api-url', { url: input.value.trim() });
+    toast(res.url ? 'Servidor local salvo: arquivos de até 2 GB' : 'Usando o servidor oficial (até 50 MB)');
+    if (typeof onApiUrlSaved === 'function') onApiUrlSaved();
+  } catch (e) {
+    toast(e.message, 'error');
+  }
+}
+
 // ── Load bot status ────────────────────────────────────────────────────
 async function loadBotStatus() {
   try {
     const s = await apiFetch('/stats/settings');
     const dot = document.getElementById('bot-dot');
     const name = document.getElementById('bot-name');
+    const apiUrl = document.getElementById('bot-api-url-input');
+    if (apiUrl) apiUrl.value = s.bot_api_url || '';
     if (s.bot_token) {
       dot?.classList.add('connected');
       if (name) name.textContent = s.bot_username ? '@' + s.bot_username : 'Bot Conectado';
@@ -432,6 +460,9 @@ function statusBadge(status) {
     sent:      ['badge-success', '📤 Enviado'],
     deleted:   ['badge-muted',   '🗑️ Apagado'],
     failed_delete: ['badge-danger', '⚠️ Falha ao apagar'],
+    paused:    ['badge-warning', '⏸️ Pausado'],
+    sending:   ['badge-accent',  '📤 Enviando'],
+    skipped:   ['badge-muted',   '⏭️ Pulada'],
   };
   const [cls, label] = map[status] || ['badge-muted', status];
   return `<span class="badge ${cls}">${label}</span>`;
