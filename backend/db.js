@@ -60,6 +60,7 @@ function initSchema() {
         name              TEXT NOT NULL,
         message_text      TEXT,
         image_path        TEXT,
+        media             TEXT,
         buttons           TEXT,
         parse_mode        TEXT DEFAULT 'HTML',
         status            TEXT DEFAULT 'draft',
@@ -69,6 +70,8 @@ function initSchema() {
       )`);
       // Migration: add auto_delete_hours to existing databases
       db.run(`ALTER TABLE campaigns ADD COLUMN auto_delete_hours INTEGER DEFAULT NULL`, [], () => {});
+      // Migration: media holds a JSON array of { path, type: 'photo' | 'video' } (replaces image_path)
+      db.run(`ALTER TABLE campaigns ADD COLUMN media TEXT`, [], () => {});
       db.run(`CREATE TABLE IF NOT EXISTS campaign_channels (
         campaign_id TEXT REFERENCES campaigns(id) ON DELETE CASCADE,
         channel_id  TEXT REFERENCES channels(id) ON DELETE CASCADE,
@@ -84,6 +87,52 @@ function initSchema() {
         created_at    TEXT DEFAULT (datetime('now')),
         next_run_at   TEXT
       )`);
+      db.run(`CREATE TABLE IF NOT EXISTS courses (
+        id                  TEXT PRIMARY KEY,
+        name                TEXT NOT NULL,
+        description         TEXT,
+        channel_id          TEXT REFERENCES channels(id) ON DELETE SET NULL,
+        status              TEXT DEFAULT 'draft',
+        caption_template    TEXT,
+        hashtag_prefix      TEXT DEFAULT '',
+        send_index          INTEGER DEFAULT 1,
+        pin_index           INTEGER DEFAULT 1,
+        protect_content     INTEGER DEFAULT 0,
+        delete_after_upload INTEGER DEFAULT 0,
+        delay_seconds       INTEGER DEFAULT 3,
+        signature           TEXT DEFAULT '',
+        intro_msg_id        TEXT,
+        index_msg_ids       TEXT,
+        last_error          TEXT,
+        created_at          TEXT DEFAULT (datetime('now')),
+        updated_at          TEXT DEFAULT (datetime('now')),
+        finished_at         TEXT
+      )`);
+      // One row per module header and per lesson file; kind = 'module' | 'lesson'
+      db.run(`CREATE TABLE IF NOT EXISTS course_items (
+        id              TEXT PRIMARY KEY,
+        course_id       TEXT NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+        kind            TEXT NOT NULL,
+        module_key      TEXT DEFAULT '',
+        rel_path        TEXT,
+        title           TEXT,
+        file_path       TEXT,
+        file_size       INTEGER,
+        media_type      TEXT,
+        owned           INTEGER DEFAULT 1,
+        position        INTEGER,
+        module_num      INTEGER,
+        num_path        TEXT,
+        lesson_num      INTEGER,
+        status          TEXT DEFAULT 'pending',
+        telegram_msg_id TEXT,
+        error_msg       TEXT,
+        sent_at         TEXT
+      )`);
+      // Migrations for databases created before nested folders and signatures
+      db.run(`ALTER TABLE courses ADD COLUMN signature TEXT DEFAULT ''`, [], () => {});
+      db.run(`ALTER TABLE course_items ADD COLUMN num_path TEXT`, [], () => {});
+      db.run(`CREATE INDEX IF NOT EXISTS idx_course_items_course ON course_items(course_id, position)`);
       db.run(`CREATE TABLE IF NOT EXISTS send_log (
         id              TEXT PRIMARY KEY,
         job_id          TEXT,
